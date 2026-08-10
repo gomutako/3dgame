@@ -13,7 +13,8 @@
 ## Global Constraints
 
 - Obiettivo di sensazione: **terrestre e vivace**.
-- **Soglia di rifiuto: occlusione media sotto il 25%.** Se le costanti nuove la fanno scendere sotto, vanno corrette — l'attrito è la leva che la governa di più, la gravità la seconda.
+- **Soglia di rifiuto: occlusione iniziale media sotto il 12%.** Misurata a pila appena caduta, non mediata sulla partita — verso la fine del livello la pila è scoperta per forza, e una media direbbe soprattutto quanto dura il finale (misurato: 5,1% mediando contro 16,5% guardando l'inizio). Se le costanti nuove la fanno scendere sotto, vanno corrette: l'attrito è la leva che la governa di più, la gravità la seconda.
+- Baseline al 2026-08-10, livelli 1-12: assestamento mediano **45 frame** (0,75 s), occlusione iniziale media **16,5%**. La Task 1b lo sposta: usare i numeri nuovi.
 - Le quattro suite di `npm run verify` devono restare verdi: `verify:levels` (ogni livello risolvibile), `verify:play` (un giocatore automatico li completa), `verify:boosters`, `verify:physics` (nessun pezzo sotto il piano).
 - **La massa non va toccata:** in un corpo rigido non cambia la velocità di caduta. Chi propone di abbassare la densità ha capito male il problema.
 - Non toccare `src/core/levels.js` e non rifare i sei `.glb` già in `public/models/`.
