@@ -43,7 +43,19 @@ export async function generateLevel(cfg, camera, rng) {
 
   const triples = order.length / 3;
   const typeCount = Math.max(1, Math.min(cfg.types, triples));
-  const hulls = getHulls();
+  // Tavolozza del livello: quali modelli rappresentano i tipi 0..typeCount-1.
+  //
+  // Estratta dal rng del livello, non da Math.random: README e DESIGN.md §7
+  // garantiscono che (seed, numero livello) produca un livello identico, e le
+  // quattro suite di verifica hanno senso solo grazie a questo — un test che
+  // gira ogni volta su un livello diverso non verifica nulla.
+  //
+  // Il resto della pipeline continua a ragionare su id densi 0..typeCount-1:
+  // solver, occlusione e vassoio non sanno nulla dei modelli. La tavolozza è
+  // il solo punto che li lega, e serve a mesh e collider.
+  const allHulls = getHulls();
+  const palette = pickPalette(allHulls.length, typeCount, rng);
+  const hulls = palette.map((m) => allHulls[m]);
 
   let types = null;
   let nestle = null;
@@ -88,6 +100,7 @@ export async function generateLevel(cfg, camera, rng) {
     // Il replay è la caduta con le forme vere: quella provvisoria non si vede mai.
     frames: nestle.frames,
     types,
+    palette,
     occlusion,
     order,
     active: order.slice(),
@@ -96,6 +109,16 @@ export async function generateLevel(cfg, camera, rng) {
     typeCount,
     settleAttempts: attempts + 1,
   };
+}
+
+/** Sottoinsieme di `count` modelli su `total`, senza ripetizioni (Fisher-Yates). */
+function pickPalette(total, count, rng) {
+  const pool = Array.from({ length: total }, (_, i) => i);
+  for (let i = total - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    [pool[i], pool[j]] = [pool[j], pool[i]];
+  }
+  return pool.slice(0, Math.min(count, total));
 }
 
 /**

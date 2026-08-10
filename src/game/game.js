@@ -29,7 +29,10 @@ export class Game {
     this.hud = hud;
     this.seed = seed;
 
-    this.types = getItemTypes();
+    this.allTypes = getItemTypes();
+    // Rimpiazzata a ogni livello dalla tavolozza estratta in generateLevel:
+    // i tipi non sono più sempre i primi N modelli dell'elenco.
+    this.types = this.allTypes;
     this.state = State.LOADING;
     this.level = 1;
 
@@ -91,6 +94,8 @@ export class Game {
     this.physics = data.physics;
     this.occlusion = data.occlusion;
     this.itemTypes = data.types;
+    this.palette = data.palette;
+    this.types = this.palette.map((m) => this.allTypes[m]);
     this.itemCount = cfg.itemCount;
     this.autoReshuffles = 0;
     this.settles = 0;
@@ -623,7 +628,10 @@ export class Game {
           item.mesh.material = this.types[typeId].material;
         }
         // Cambiata la forma, cambia il collider: la pila si riassesta di conseguenza.
-        this.physics.setShapes(this.itemTypes, getHulls());
+        // Gli scafi vanno presi nella tavolozza del livello, non nell'elenco
+        // completo: gli id dei tipi sono densi (0..K-1) e la tavolozza è la
+        // sola cosa che li lega ai modelli veri.
+        this.physics.setShapes(this.itemTypes, this.palette.map((m) => getHulls()[m]));
         this.pendingSettle = true;
       },
     });
