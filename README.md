@@ -33,6 +33,12 @@ non deve mai raggiungere il giocatore. Rilanciala dopo ogni modifica a
 `src/level/`, a `src/scene/setup.js` (l'inquadratura definisce l'occlusione)
 o alla curva di difficoltà.
 
+## Pubblicazione
+
+Il gioco sta su **[3dgame.pallade.it](https://3dgame.pallade.it)**: un Worker
+Cloudflare di soli asset statici, ricostruito a ogni push su `master`.
+Configurazione e verifiche in **[DEPLOY.md](DEPLOY.md)**.
+
 ## Struttura
 
 ```text
