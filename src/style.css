@@ -24,7 +24,21 @@ body {
   touch-action: manipulation;
 }
 
-#scene { position: fixed; inset: 0; display: block; }
+/*
+ * `touch-action: none` sul canvas, e non basta il `manipulation` del body.
+ *
+ * `manipulation` toglie solo il doppio-tap per lo zoom: pan e pinch restano al
+ * browser. Su un canvas che gestisce il trascinamento con i pointer event
+ * significa che Safari interpreta lo scorrimento del dito come gesto suo,
+ * emette `pointercancel` e il drag muore a metà — la scatola non gira.
+ *
+ * Serve anche a un secondo scopo: `user-scalable=no` nel meta viewport è
+ * IGNORATO da iOS Safari dalla versione 10, quindi il pinch-zoom sulla pagina
+ * funziona comunque, e una pagina zoomata mostra la scatola enorme e spostata
+ * fuori campo. `none` impedisce al pinch di iniziare sul canvas, che è quasi
+ * tutta la superficie.
+ */
+#scene { position: fixed; inset: 0; display: block; touch-action: none; }
 
 /* ---------- HUD ---------- */
 

@@ -177,6 +177,23 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
   distanza che tiene dentro pila, scatola e vassoio (con margine sotto per i pulsanti).
   Vale per qualsiasi proporzione di schermo — e siccome il grafo di occlusione nasce
   da questa camera, l'ordine è vincolante: misure → camera → generazione.
+- **Il canvas misura sé stesso, non la finestra.** Su iOS `innerHeight`
+  comprende l'area dietro le barre di Safari, mentre il canvas fisso a `inset: 0`
+  copre solo la parte visibile. Usare `innerWidth/innerHeight` per inquadratura e
+  coordinate del tocco produce due sintomi che sembrano scollegati: la scatola
+  inquadrata per un aspetto sbagliato, e i tocchi normalizzati su un'altezza che
+  non è quella disegnata — si tocca un pezzo e si prende il vuoto. Le barre poi
+  compaiono e scompaiono *senza* un evento `resize` della finestra: servono un
+  `ResizeObserver` sul canvas e l'ascolto di `visualViewport`.
+- **`touch-action: none` sul canvas, e `manipulation` non basta.** `manipulation`
+  toglie solo il doppio-tap per lo zoom: pan e pinch restano al browser, che
+  interpreta il trascinamento come gesto suo ed emette `pointercancel` — la
+  scatola smette di girare a metà gesto. Serve anche perché `user-scalable=no`
+  nel meta viewport è **ignorato da iOS Safari dalla versione 10**: senza, la
+  pagina si lascia zoomare e la scatola finisce enorme e fuori campo.
+- **Un `pointercancel` non è un tap.** Trattarlo come tale fa prendere al
+  giocatore un pezzo che non ha scelto, proprio nel momento in cui il browser gli
+  ha rubato il gesto.
 - **Il dito non si blocca durante il *pop*.** Il vassoio *logico* è già coerente
   nell'istante in cui la tripletta si forma — `Tray.insert()` toglie i tre pezzi
   subito — quindi bloccare l'input per i ~0,7 s dell'animazione non proteggeva
