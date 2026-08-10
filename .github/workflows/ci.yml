@@ -1,0 +1,32 @@
+name: CI
+
+# Verifica in sviluppo: gira sui push a develop e sulle PR verso develop/master.
+# Il deploy NON passa da qui: lo fa Cloudflare al push su master (vedi DEPLOY.md).
+# Il gate esiste comunque, ma solo se si pubblica passando da una pull request:
+# la PR verso master è verde soltanto se le verifiche headless confermano che
+# ogni livello generato è risolvibile.
+on:
+  push:
+    branches: [develop]
+  pull_request:
+    branches: [master, develop]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm install --no-audit --no-fund
+      - name: Build
+        run: npm run build
+
+      # La verifica più importante del progetto: fisica, occlusione, solver e
+      # game loop sono pura logica e girano senza browser. `verify:levels` è la
+      # rete che impedisce a un livello impossibile di arrivare in produzione.
+      - name: Verifiche headless
+        run: npm run verify
+        timeout-minutes: 15
