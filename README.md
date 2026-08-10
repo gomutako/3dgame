@@ -27,6 +27,8 @@ npm run verify:play 1 20    # un giocatore automatico porta a termine i livelli
 npm run verify:play 1 20 --ruota   # idem, girando la scatola fra una presa e l'altra
 npm run verify:boosters 9   # undo, hint, shuffle
 npm run verify:physics 1 12 # assestamento, occlusione, nessun pezzo nel fondo
+npm run verify:picking 3 8  # nessun tipo è un bersaglio troppo piccolo
+npm run verify:input 9      # si può prendere anche durante il pop
 ```
 
 `verify:levels` è la rete di sicurezza più importante: un livello impossibile

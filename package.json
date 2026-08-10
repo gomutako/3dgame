@@ -8,7 +8,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify-levels.mjs 1 25 && node scripts/playthrough.mjs 1 15 && node scripts/verify-boosters.mjs 9 && node scripts/verify-physics.mjs 1 12 && node scripts/verify-picking.mjs 3 8",
+    "verify": "node scripts/verify-levels.mjs 1 25 && node scripts/playthrough.mjs 1 15 && node scripts/verify-boosters.mjs 9 && node scripts/verify-physics.mjs 1 12 && node scripts/verify-picking.mjs 3 8 && node scripts/verify-input.mjs 9",
     "verify:levels": "node scripts/verify-levels.mjs",
     "verify:play": "node scripts/playthrough.mjs",
     "verify:boosters": "node scripts/verify-boosters.mjs",
@@ -19,7 +19,8 @@
     "predev": "node scripts/sync-models.mjs",
     "prebuild": "node scripts/sync-models.mjs",
     "preverify": "node scripts/sync-models.mjs",
-    "verify:picking": "node scripts/verify-picking.mjs"
+    "verify:picking": "node scripts/verify-picking.mjs",
+    "verify:input": "node scripts/verify-input.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",

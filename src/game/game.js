@@ -60,6 +60,7 @@ export class Game {
 
     this.physics = null;
     this.pendingSettle = false;
+    this.clearing = 0;
     this.autoReshuffles = 0;
     this.settles = 0;
 
@@ -156,6 +157,7 @@ export class Game {
     this.physics?.dispose();
     this.physics = null;
     this.pendingSettle = false;
+    this.clearing = 0;
     for (const item of this.items) if (item) this.group.remove(item.mesh);
     this.items = [];
     this.pile = [];
@@ -395,7 +397,13 @@ export class Game {
     this.history.push(item);
 
     if (matched) {
-      this.state = State.BUSY;
+      // Niente BUSY qui: il dito resta libero per tutto il pop.
+      //
+      // Si può perché il vassoio *logico* è già coerente — Tray.insert() ha
+      // tolto i tre pezzi nell'istante in cui il match si è formato, quindi
+      // canAccept() dice il vero mentre l'animazione va avanti. Il blocco era
+      // solo dell'interfaccia, e ~0,7 s a ogni tripletta spezzavano il ritmo.
+      this.clearing++;
       this.history = []; // l'undo non attraversa un match
       this.layout(before);
       this.flyToSlot(item, before.indexOf(item));
@@ -444,10 +452,20 @@ export class Game {
       this.items[m.index] = null;
     }
     this.cleared += matched.length;
+    this.clearing--;
     this.hud.setProgress(this.cleared, this.total);
     this.layout(this.tray.items);
 
-    if (this.pile.length === 0 && this.tray.size === 0) {
+    // Il verdetto è già stato dato altrove: non tornare indietro.
+    // Potendo prendere durante il pop, il giocatore può riempire il vassoio
+    // mentre l'animazione va: la sconfitta scatta a FLIGHT, questa callback a
+    // FLIGHT + CLEAR. Senza questa riga rimetterebbe PLAYING e lo
+    // resusciterebbe da sconfitto.
+    if (this.state === State.LOST || this.state === State.WON) return;
+
+    // `clearing` conta i pop ancora in volo: con due triplette sovrapposte la
+    // vittoria si dichiarerebbe mentre dei pezzi stanno ancora animando.
+    if (this.pile.length === 0 && this.tray.size === 0 && this.clearing === 0) {
       this.state = State.WON;
       this.hud.showResult('win', this.level);
       return;

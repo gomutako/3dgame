@@ -177,6 +177,14 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
   distanza che tiene dentro pila, scatola e vassoio (con margine sotto per i pulsanti).
   Vale per qualsiasi proporzione di schermo — e siccome il grafo di occlusione nasce
   da questa camera, l'ordine è vincolante: misure → camera → generazione.
+- **Il dito non si blocca durante il *pop*.** Il vassoio *logico* è già coerente
+  nell'istante in cui la tripletta si forma — `Tray.insert()` toglie i tre pezzi
+  subito — quindi bloccare l'input per i ~0,7 s dell'animazione non proteggeva
+  niente: spezzava solo il ritmo. Il permesso però apre due trappole, entrambe
+  sorvegliate da `npm run verify:input`: `finishMatch` non deve rimettere PLAYING
+  se nel frattempo il verdetto è già caduto (riempiendo il vassoio durante il pop
+  la sconfitta scatta *prima* della fine dell'animazione, e il giocatore veniva
+  resuscitato), e la vittoria va dichiarata solo quando nessun pop è più in volo.
 - **La sconfitta è decisa nella logica, non in una callback di animazione.** Un tween
   ucciso o saltato non deve poter far sopravvivere il giocatore; il verdetto è già
   preso quando il quinto pezzo parte, l'animazione ne ritarda solo la comunicazione.
