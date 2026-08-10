@@ -124,24 +124,54 @@ dedotto dal codice che li carica (`src/scene/shapes.js`), non da regole generich
 | UV | presenti se il modello ha texture | senza UV il codice ne inventa di nulle e il modello pesca il colore da un solo texel |
 | silhouette e colore | distinti dai tipi già presenti | forma *e* colore ridondanti: leggibile per daltonici e su schermo piccolo |
 
-### 5.4 Lo strumento
+### 5.4 Gli strumenti
 
-`npm run check-model <file.glb>` — verifica un candidato e stampa, riga per riga
-con verdetto passa/non passa: triangoli, proporzioni della bounding box, numero
-e dimensione delle texture, materiali, peso del file. Esce con codice diverso da
-zero se un requisito **obbligatorio** non è rispettato.
+I modelli arrivano dal web nei formati più vari e quasi sempre **fuori
+specifica**. Un caso reale, esaminato in fase di design: una fragola distribuita
+come `.blend` (8 MB), `.obj` (9,8 MB), `.fbx`, `.dae` e un archivio di texture da
+8,73 MB. Nessun `.glb`, ~100.000–200.000 triangoli stimati contro un tetto di
+8.000, texture verosimilmente 2048² o 4096² contro un tetto di 256².
 
-Serve a evitare il ciclo «trovo dieci modelli, otto vanno buttati dopo
-l'integrazione».
+Verificare e basta lascerebbe all'utente tutto il lavoro di conversione. Servono
+quindi due comandi.
 
-Non fa parte di questo strumento il giudizio su silhouette e colore: è
-percettivo, lo dà l'occhio.
+**`npm run check-model <file.glb>`** — referto su un `.glb`: triangoli,
+proporzioni della bounding box, numero e dimensione delle texture, materiali,
+peso. Riga per riga, verdetto passa/non passa. Esce diverso da zero se un
+requisito obbligatorio non è rispettato.
+
+**`npm run prepare-model <file>`** — la pipeline completa:
+
+1. accetta `.obj` (con il suo `.mtl` e le texture accanto) oppure un `.glb`
+2. converte in glTF
+3. decima la geometria sotto la soglia dei triangoli
+4. riduce le texture a 256²
+5. impacchetta in un `.glb` singolo con le texture incorporate
+6. stampa il referto **prima/dopo** e chiude con `check-model`
+
+Strumenti: `obj2gltf` e `@gltf-transform/cli`, entrambi installabili da npm.
+**Blender non è richiesto** — non è disponibile sulla macchina di sviluppo e la
+pipeline è interamente da riga di comando. Chi ha Blender può comunque esportare
+`.glb` per conto suo e passare direttamente da `check-model`.
+
+Restano **fuori** da entrambi gli strumenti due giudizi, perché sono percettivi
+e non misurabili:
+
+- **la silhouette**, cioè se il modello si distingue dai tipi già presenti. Il
+  caso della fragola lo illustra: proporzioni a norma, ma il primo tipo in lista
+  è un avocado, e due frutti tondeggianti di taglia simile si distinguono per
+  colore molto più che per forma — mentre il design chiede che forma **e** colore
+  siano ridondanti.
+- **la licenza**, che va letta sulla pagina di origine. CC0 o CC BY, senza
+  marchi. È il filtro che ha già escluso DamagedHelmet (CC BY-NC) e Duck
+  (licenza proprietaria Sony).
 
 ## 6. Cosa questa spec NON fa
 
 - Non aggiunge modelli: non esistono ancora i file.
 - Non alza `TYPE_COUNT` e non tocca `src/core/levels.js`.
-- Non tocca la pipeline di riduzione delle texture.
+- Non tocca i sei `.glb` già in `public/models/`: `prepare-model` serve ai
+  candidati nuovi, non a rifare quelli esistenti.
 
 Va però registrato ora, perché condiziona il lavoro futuro: alzare `TYPE_COUNT`
 non è gratis. `levelConfig` calcola
@@ -162,10 +192,16 @@ difficoltà è ferma da metà curva**.
 ## 7. Verifiche
 
 ```bash
-npm run verify            # le quattro suite, compresa verify-physics estesa
-npm run verify:physics    # ritmo, occlusione, nessun pezzo sotto il piano
-npm run check-model <f>   # un candidato modello
+npm run verify              # le quattro suite, compresa verify-physics estesa
+npm run verify:physics      # ritmo, occlusione, nessun pezzo sotto il piano
+npm run prepare-model <f>   # converte e riduce un candidato, poi lo verifica
+npm run check-model <f.glb> # solo il referto, su un .glb già pronto
 ```
+
+`prepare-model` va provato su un file vero prima di dichiararlo funzionante: un
+convertitore che gira senza errori ma produce una geometria irriconoscibile ha
+fallito lo stesso. Il modello della fragola del §5.4 è il caso di prova naturale,
+se l'utente lo scarica.
 
 A giudizio finale, però, la fisica la decide l'occhio: la tabella dice se il
 gioco è ancora giocabile, non se la caduta è piacevole. Serve una prova a mano
