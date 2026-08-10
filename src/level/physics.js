@@ -207,13 +207,24 @@ export class PileWorld {
       const type = typeOf[i];
       if (type < 0) continue;
 
-      while (body.numColliders() > 0) this.world.removeCollider(body.collider(0), false);
-
       // Scafo *arrotondato*: la punta di un cono resta una punta, ma il contatto
       // ha un margine e non vibra. I punti sono già rimpiccioliti di HULL_SKIN,
       // così l'ingombro finale coincide con la forma disegnata.
-      const desc = RAPIER.ColliderDesc.roundConvexHull(hulls[type], HULL_SKIN);
-      if (!desc) continue; // scafo degenere: tiene il collider precedente
+      //
+      // Prima si costruisce, poi si sostituisce. Rimuovere per primo e poi
+      // rinunciare lascerebbe il corpo SENZA collider — cioè attraversa il fondo
+      // e cade per sempre — mentre l'intenzione è tenersi quello di prima.
+      // Su una nuvola di punti degenere Rapier non restituisce null: va in
+      // panico dal wasm, quindi non basta controllare il valore di ritorno.
+      let desc = null;
+      try {
+        desc = RAPIER.ColliderDesc.roundConvexHull(hulls[type], HULL_SKIN);
+      } catch {
+        desc = null;
+      }
+      if (!desc) continue; // scafo degenere: tiene il collider uniforme
+
+      while (body.numColliders() > 0) this.world.removeCollider(body.collider(0), false);
       this.world.createCollider(desc.setFriction(0.75).setRestitution(0.12), body);
       body.wakeUp();
     }
