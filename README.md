@@ -26,13 +26,34 @@ npm run verify:levels 1 30  # ogni livello è generato risolvibile e bilanciato
 npm run verify:play 1 20    # un giocatore automatico porta a termine i livelli
 npm run verify:play 1 20 --ruota   # idem, girando la scatola fra una presa e l'altra
 npm run verify:boosters 9   # undo, hint, shuffle
-npm run verify:physics 1 12 # nessun pezzo sprofonda nel fondo della scatola
+npm run verify:physics 1 12 # assestamento, occlusione, nessun pezzo nel fondo
+npm run verify:picking 3 8  # nessun tipo è un bersaglio troppo piccolo
+npm run verify:input 9      # si può prendere anche durante il pop
 ```
 
 `verify:levels` è la rete di sicurezza più importante: un livello impossibile
 non deve mai raggiungere il giocatore. Rilanciala dopo ogni modifica a
 `src/level/`, a `src/scene/setup.js` (l'inquadratura definisce l'occlusione)
 o alla curva di difficoltà.
+
+## Aggiungere un oggetto
+
+I modelli stanno in `public/models/` come `.glb` singoli, con le texture dentro.
+**Copiarne uno lì dentro basta**: l'elenco lo rigenera `scripts/sync-models.mjs`
+prima di `dev`, `build` e `verify`, e ogni livello pesca la sua tavolozza fra
+quelli disponibili.
+
+Un file scaricato dal web quasi mai rispetta i limiti — casi reali incontrati:
+98.000 triangoli, e 21,8 MB di texture 2048².
+
+```bash
+npm run prepare-model ~/Downloads/Fragola.obj fragola   # converte, decima, riduce
+npm run check-model public/models/fragola.glb           # solo il referto
+```
+
+Entrano in gioco **solo** i modelli che passano `check-model`; gli altri vengono
+esclusi con la motivazione. Licenza e leggibilità della silhouette restano
+giudizio umano: gli strumenti misurano il resto.
 
 ## Pubblicazione
 

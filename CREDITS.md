@@ -10,14 +10,38 @@ Gli oggetti che cadono nella scatola vengono dai **glTF Sample Assets** di
 | Avocado | Public | CC0 1.0 |
 | BoomBox | Public | CC0 1.0 |
 | WaterBottle | Public | CC0 1.0 |
-| AntiqueCamera | UX3D | CC0 1.0 (+ logo UX3D, marchio) |
 | Corset | UX3D | CC0 1.0 |
-| SunglassesKhronos | Darmstadt Graphics Group GmbH | CC BY 4.0 (+ logo Khronos, marchio) |
 
-**Nota sui marchi.** AntiqueCamera e SunglassesKhronos contengono logo di UX3D e
-Khronos. Il *contenuto* è CC0 / CC BY, ma il logo resta un marchio dei rispettivi
-titolari: non è utilizzabile per suggerire una loro approvazione del gioco. Se il
-progetto diventa un prodotto, questi due vanno sostituiti.
+AntiqueCamera e SunglassesKhronos sono stati rimossi dal set: contenevano i logo
+di UX3D e Khronos, marchi dei rispettivi titolari anche se il modello è CC0/CC BY.
+
+## ⚠️ Modelli di provenienza non verificata
+
+Aggiunti il 2026-08-11 scaricandoli dal web. **Autore, origine e licenza non
+sono stati accertati**, ed è una scelta consapevole di chi sviluppa, non una
+dimenticanza: serviva variare il set in fretta durante la messa a punto.
+
+| Modello |
+|---|
+| 3d_demo_30 |
+| Hex-Dumbell |
+| Rubik |
+| TEA |
+| flashlight |
+| lantern |
+| mastertux-cup-209 |
+| mastertux-vase-1546 |
+| mastertux-water-polo-62 |
+| tiny_planet_friends_3d-packaging-2922 |
+| vase |
+| wings_of_freedom-bell-3055 |
+
+**Cosa comporta.** Il gioco è pubblicato su un sito pubblico, quindi ridistribuisce
+questi file a chiunque lo apra. Finché resta un prototipo personale il rischio è
+basso; **prima di farne un prodotto** — o di metterlo su uno store — ogni riga qui
+sopra va sostituita da autore e licenza verificati, oppure il modello va cambiato.
+Lo stesso filtro che ha già escluso DamagedHelmet (CC BY-NC, vieta l'uso
+commerciale) e Duck (licenza proprietaria Sony) va applicato a questi.
 
 **Nota sulle licenze scartate.** Fra i candidati c'erano anche *DamagedHelmet*
 (CC BY-NC 4.0: vieta l'uso commerciale) e *Duck* (SCEA Shared Source, licenza

@@ -39,13 +39,23 @@ Tre leve indipendenti, non solo "più oggetti":
 | Leva | L1 | L10 | L25 | tetto | Effetto |
 |---|---|---|---|---|---|
 | Triplette `T` | 7 | 15 | 25 | 30 | Durata + profondità della pila |
-| Tipi distinti `K` | 3 | 8 | 12 | 12 | Pressione sul vassoio |
+| Tipi distinti `K` | 3 | 8 | 11 | `TYPE_COUNT` | Pressione sul vassoio |
 | **Spread `W`** | 2,4 | 9,1 | 16 | 16 | Quanto sono "lontane" fra loro le tre copie di una tripletta nell'ordine di sfoltimento |
 
 `W` è la vera difficoltà: misura quanti pezzi *inutili* devi tenere in mano prima
 di chiudere una tripletta. È la leva che rende un livello "pensato" e non solo lungo.
 Ogni 5 livelli un livello **respiro** (`W` dimezzato) per il ritmo — L10 e L25 sono
 livelli respiro, quindi il loro `W` effettivo è la metà di quello in tabella.
+
+Il tetto di `K` non è una costante: vale `TYPE_COUNT`, cioè quanti modelli
+validi ci sono in `public/models/` (oggi 11). Aggiungere un oggetto alza la
+varietà dei livelli alti — misurato: da 6 a 11 modelli i livelli 13-22 restano
+tutti completabili dal giocatore automatico, con zero riassetti d'ufficio.
+
+La tabella indicava 12, numero ereditato dal Food Kit di Kenney che il gioco
+usava prima (vedi CREDITS.md). Con soli 6 modelli Khronos la leva della varietà
+era in realtà ferma dal livello 6 in poi: una delle tre leve non lavorava per la
+maggior parte della curva.
 
 Numeri esatti in `src/core/levels.js`; `npm run verify:levels` li stampa livello per livello.
 
@@ -121,10 +131,23 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
   `npm run verify:play` (livelli 1–22, una frana per ogni presa) non è ancora servito
   nemmeno una volta: è una rete, non una stampella.
 - **Forma + colore ridondanti.** Ogni tipo ha silhouette e colore distinti: leggibile
-  per daltonici e a colpo d'occhio su schermo piccolo. I 12 modelli sono scelti fra i
-  campioni glTF di Khronos passando tre filtri — licenza, compattezza e peso in
-  scena — e **ordinati per contrasto decrescente**: un livello usa i primi N tipi,
-  quindi in testa vanno quelli che si distinguono di più.
+  per daltonici e a colpo d'occhio su schermo piccolo. I modelli passano tre filtri —
+  licenza, compattezza e peso in scena — che oggi applica `npm run check-model`, con
+  soglie tarate sul set in produzione invece che dedotte a tavolino.
+- **Ogni livello pesca la sua tavolozza.** Non più «i primi N tipi dell'elenco»: il
+  livello estrae un sottoinsieme di modelli dal **proprio rng**, quindi due livelli
+  vicini mostrano oggetti diversi ma `(seed, livello)` resta riproducibile — le quattro
+  suite hanno senso solo grazie a questo. Il prezzo è che si perde l'ordinamento per
+  contrasto decrescente: un livello basso può pescare silhouette simili fra loro.
+- **La caduta è tarata su due metriche, non a occhio.** «Meno pesante» non si ottiene
+  abbassando la massa: in un corpo rigido non cambia la velocità di caduta. Le leve
+  vere sono gravità, rimbalzo, smorzamento e attrito. Ma ammorbidirle degrada due
+  grandezze nella direzione opposta: l'assestamento si allunga (e il grafo si
+  ricostruisce solo a pila ferma, quindi diventa attesa fra una presa e l'altra) e
+  soprattutto la pila si **appiattisce**. Il rimbalzo è la leva che costa più
+  occlusione — misurato: 17,2% a 0,20, 19,4% a 0,12, 20,4% a 0,06 — mentre l'attrito,
+  che sembrava la leva principale, fra 0,65 e 0,85 non sposta nulla. `verify:physics`
+  misura entrambe e fallisce sotto il 12% di occlusione media.
 - **Il peso in scena è un criterio di scelta, non un dettaglio.** Con 60 pezzi in
   scatola, un modello da 100.000 triangoli ne fa 6 milioni per fotogramma: due
   candidati sono stati scartati per questo, prima che per l'estetica.
@@ -145,10 +168,37 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
 - **La scatola si dimensiona sul numero di pezzi**, per tenere la pila sui ~3 strati.
   A scatola fissa i primi livelli sarebbero un unico strato piatto: nessuna occlusione,
   quindi nessun puzzle. È la sovrapposizione a fare il gioco, non la quantità.
+  Il minimo del lato non è arbitrario: sotto, il passo fra le colonne di spawn scende
+  sotto il diametro di un pezzo e i pezzi nascono compenetrati; con una sola colonna
+  nascono in torre, più alti dei muri. Era fissato a 3 e vinceva sempre lui sui primi
+  livelli, che infatti misuravano **occlusione 0%** — proprio ciò che questo
+  dimensionamento esiste per evitare.
 - **Inquadratura calcolata, non tarata a mano.** La camera risolve iterativamente la
   distanza che tiene dentro pila, scatola e vassoio (con margine sotto per i pulsanti).
   Vale per qualsiasi proporzione di schermo — e siccome il grafo di occlusione nasce
   da questa camera, l'ordine è vincolante: misure → camera → generazione.
+- **La dimensione viene da `window`, non dal rettangolo del canvas.** Provato al
+  contrario e rotto: un canvas non ancora impaginato misura 300×150 — il suo
+  default — e il renderer nasce di quella taglia, disegnando il gioco in un
+  francobollo in alto a sinistra mentre l'HUD, che è DOM, resta a posto. Dal
+  canvas si prende solo l'origine, per convertire le coordinate del puntatore.
+- **`touch-action: none` sul canvas, e `manipulation` non basta.** `manipulation`
+  toglie solo il doppio-tap per lo zoom: pan e pinch restano al browser, che
+  interpreta il trascinamento come gesto suo ed emette `pointercancel` — la
+  scatola smette di girare a metà gesto. Serve anche perché `user-scalable=no`
+  nel meta viewport è **ignorato da iOS Safari dalla versione 10**: senza, la
+  pagina si lascia zoomare e la scatola finisce enorme e fuori campo.
+- **Un `pointercancel` non è un tap.** Trattarlo come tale fa prendere al
+  giocatore un pezzo che non ha scelto, proprio nel momento in cui il browser gli
+  ha rubato il gesto.
+- **Il dito non si blocca durante il *pop*.** Il vassoio *logico* è già coerente
+  nell'istante in cui la tripletta si forma — `Tray.insert()` toglie i tre pezzi
+  subito — quindi bloccare l'input per i ~0,7 s dell'animazione non proteggeva
+  niente: spezzava solo il ritmo. Il permesso però apre due trappole, entrambe
+  sorvegliate da `npm run verify:input`: `finishMatch` non deve rimettere PLAYING
+  se nel frattempo il verdetto è già caduto (riempiendo il vassoio durante il pop
+  la sconfitta scatta *prima* della fine dell'animazione, e il giocatore veniva
+  resuscitato), e la vittoria va dichiarata solo quando nessun pop è più in volo.
 - **La sconfitta è decisa nella logica, non in una callback di animazione.** Un tween
   ucciso o saltato non deve poter far sopravvivere il giocatore; il verdetto è già
   preso quando il quinto pezzo parte, l'animazione ne ritarda solo la comunicazione.

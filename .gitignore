@@ -3,3 +3,10 @@ dist/
 .wrangler/
 .DS_Store
 *.log
+
+# Metadati dei download di Windows (Alternate Data Stream)
+*:Zone.Identifier
+
+# Copie di lavoro dei modelli. Vanno tenute FUORI da public/: Vite copia
+# quella cartella per intero nella build, .gitignore non c'entra nulla.
+models-backup/

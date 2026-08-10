@@ -21,14 +21,36 @@ await loadItemTypes();
 
 const game = new Game({ scene, camera, hud });
 
+/**
+ * Misure della superficie di gioco.
+ *
+ * La dimensione viene da `window`, non dal rettangolo del canvas: un canvas non
+ * ancora impaginato misura 300×150 — il suo default — e il renderer nascerebbe
+ * di quella taglia, disegnando il gioco in un francobollo in alto a sinistra.
+ * (Provato: succede davvero, l'HUD resta a posto perché è DOM e non dipende da
+ * questa misura.)
+ *
+ * L'origine invece viene dal canvas: serve a convertire le coordinate del
+ * puntatore. Con `position: fixed; inset: 0` è (0, 0), ma sottrarla non costa
+ * nulla e regge se un giorno il canvas non occupasse più tutto.
+ */
+function viewport() {
+  const r = canvas.getBoundingClientRect();
+  return { w: Math.max(1, innerWidth), h: Math.max(1, innerHeight), left: r.left, top: r.top };
+}
+
 function resize() {
-  const w = innerWidth;
-  const h = innerHeight;
-  renderer.setSize(w, h, false);
+  const { w, h } = viewport();
+  renderer.setSize(Math.round(w), Math.round(h), false);
   layoutWorld(scene, camera, w / h);
   game.relayout();
 }
 addEventListener('resize', resize);
+
+// Su iOS le barre di Safari compaiono e scompaiono cambiando l'area visibile,
+// e non sempre lo accompagna un `resize` della finestra.
+visualViewport?.addEventListener('resize', resize);
+
 resize();
 
 // Un solo dito fa due cose: trascinare gira la scatola, toccare prende un pezzo.
@@ -62,14 +84,22 @@ canvas.addEventListener('pointermove', (e) => {
   if (!game.dragging) game.beginRotate();
 
   const now = performance.now();
-  const angle = (dx / innerWidth) * TURN_PER_SCREEN;
+  const angle = (dx / viewport().w) * TURN_PER_SCREEN;
   game.rotate(angle);
   drag.velocity = angle / Math.max(1 / 240, (now - drag.time) / 1000);
   drag.time = now;
 });
 
-function endDrag(e) {
+function endDrag(e, cancelled = false) {
   if (!drag || e.pointerId !== drag.id) return;
+
+  // Un gesto annullato dal browser non è un tap: prenderebbe un pezzo che il
+  // giocatore non ha scelto.
+  if (cancelled) {
+    drag = null;
+    game.endRotate(0);
+    return;
+  }
 
   const tapped = drag.travel <= DRAG_THRESHOLD;
   // Se il dito si era già fermato prima di staccarsi, niente inerzia:
@@ -78,12 +108,16 @@ function endDrag(e) {
   const velocity = stale ? 0 : drag.velocity;
   drag = null;
 
-  if (tapped) game.pickAt(e.clientX, e.clientY, innerWidth, innerHeight);
-  else game.endRotate(velocity);
+  if (tapped) {
+    const { w, h, left, top } = viewport();
+    game.pickAt(e.clientX - left, e.clientY - top, w, h);
+  } else {
+    game.endRotate(velocity);
+  }
 }
 
-canvas.addEventListener('pointerup', endDrag);
-canvas.addEventListener('pointercancel', endDrag);
+canvas.addEventListener('pointerup', (e) => endDrag(e));
+canvas.addEventListener('pointercancel', (e) => endDrag(e, true));
 
 // Debug rapido: ?level=12 per saltare direttamente a un livello.
 const startLevel = Number(new URLSearchParams(location.search).get('level')) || 1;

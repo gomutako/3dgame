@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getItemTypes, getHulls } from '../scene/shapes.js';
+import { getItemTypes, getHulls, getPickGeometries } from '../scene/shapes.js';
 import { traySlotPosition, layoutWorld, computeBoxSize, getArena, TRAY } from '../scene/setup.js';
 import { levelConfig } from '../core/levels.js';
 import { Rng, levelSeed } from '../core/rng.js';
@@ -29,7 +29,12 @@ export class Game {
     this.hud = hud;
     this.seed = seed;
 
-    this.types = getItemTypes();
+    this.allTypes = getItemTypes();
+    this.allPickGeometries = getPickGeometries();
+    // Rimpiazzata a ogni livello dalla tavolozza estratta in generateLevel:
+    // i tipi non sono più sempre i primi N modelli dell'elenco.
+    this.types = this.allTypes;
+    this.pickGeometries = this.allPickGeometries;
     this.state = State.LOADING;
     this.level = 1;
 
@@ -55,10 +60,14 @@ export class Game {
 
     this.physics = null;
     this.pendingSettle = false;
+    this.clearing = 0;
     this.autoReshuffles = 0;
     this.settles = 0;
 
     this.raycaster = new THREE.Raycaster();
+    // I bersagli del dito stanno sul layer 1 per non essere disegnati; senza
+    // questa riga il raycaster, che di suo guarda solo il layer 0, non li vede.
+    this.raycaster.layers.enable(1);
     this.pointer = new THREE.Vector2();
   }
 
@@ -91,6 +100,9 @@ export class Game {
     this.physics = data.physics;
     this.occlusion = data.occlusion;
     this.itemTypes = data.types;
+    this.palette = data.palette;
+    this.types = this.palette.map((m) => this.allTypes[m]);
+    this.pickGeometries = this.palette.map((m) => this.allPickGeometries[m]);
     this.itemCount = cfg.itemCount;
     this.autoReshuffles = 0;
     this.settles = 0;
@@ -122,8 +134,20 @@ export class Game {
     mesh.matrixAutoUpdate = true;
     this.group.add(mesh);
 
-    const item = { index, type: typeId, mesh, state: 'pile', home: null, tween: null };
+    const item = { index, type: typeId, mesh, pick: null, state: 'pile', home: null, tween: null };
     mesh.userData.item = item;
+
+    // Bersaglio del dito: lo scafo convesso, invisibile, figlio della mesh —
+    // così segue posizione e rotazione senza codice di sincronizzazione.
+    // Il layer 1 lo tiene fuori dal rendering: la camera disegna solo il layer 0.
+    const pick = new THREE.Mesh(this.pickGeometries[typeId]);
+    pick.layers.set(1);
+    pick.castShadow = false;
+    pick.receiveShadow = false;
+    pick.userData.item = item;
+    mesh.add(pick);
+    item.pick = pick;
+
     return item;
   }
 
@@ -133,6 +157,7 @@ export class Game {
     this.physics?.dispose();
     this.physics = null;
     this.pendingSettle = false;
+    this.clearing = 0;
     for (const item of this.items) if (item) this.group.remove(item.mesh);
     this.items = [];
     this.pile = [];
@@ -308,24 +333,42 @@ export class Game {
   pickAt(clientX, clientY, width, height) {
     if (this.state !== State.PLAYING || !this.tray.canAccept()) return null;
 
-    this.pointer.set((clientX / width) * 2 - 1, -(clientY / height) * 2 + 1);
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-
-    const hits = this.castAtPile();
+    const hits = this.castAtScreen(clientX, clientY, width, height);
     if (hits.length === 0) return null;
 
     this.take(hits[0].object.userData.item);
     return hits[0].object.userData.item;
   }
 
+  /** Raycast da un punto dello schermo. */
+  castAtScreen(clientX, clientY, width, height) {
+    this.pointer.set((clientX / width) * 2 - 1, -(clientY / height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return this.castAtPile();
+  }
+
   /**
-   * Raycast contro la pila. Aggiorna prima le matrici del grafo di scena:
-   * nel browser lo farebbe il renderer, ma questo codice gira anche headless
-   * negli harness, dove nessuno disegna nulla.
+   * Raycast contro la pila, col raggio già impostato dal chiamante.
+   *
+   * Mira agli **scafi convessi**, non alle mesh disegnate. Il motivo è che
+   * `normalize()` pareggia la *sfera* contenitiva, non l'area della silhouette:
+   * un dado riempie la sua sfera, un paio di occhiali — che è per lo più vuoto —
+   * ne occupa un settimo. Col raycast sulla mesh dettagliata il dito deve
+   * infilare la montatura, e il raggio che passa nel buco fra le lenti prende il
+   * pezzo dietro. Misurato sui livelli 3-10: gli occhiali si prendevano nel 28%
+   * dei casi contro il 93% del dado; mirando allo scafo, 76% contro 87%.
+   *
+   * Lo scafo convesso è anche la forma con cui il pezzo si comporta davvero
+   * nella pila — è il collider di Rapier — quindi il dito prende esattamente
+   * l'ingombro che il giocatore vede spingere e franare.
+   *
+   * Aggiorna prima le matrici del grafo di scena: nel browser lo farebbe il
+   * renderer, ma questo codice gira anche headless negli harness, dove nessuno
+   * disegna nulla.
    */
   castAtPile() {
     this.arena.updateMatrixWorld(true);
-    return this.raycaster.intersectObjects(this.pile.map((i) => i.mesh), false);
+    return this.raycaster.intersectObjects(this.pile.map((i) => i.pick), false);
   }
 
   take(item) {
@@ -354,7 +397,13 @@ export class Game {
     this.history.push(item);
 
     if (matched) {
-      this.state = State.BUSY;
+      // Niente BUSY qui: il dito resta libero per tutto il pop.
+      //
+      // Si può perché il vassoio *logico* è già coerente — Tray.insert() ha
+      // tolto i tre pezzi nell'istante in cui il match si è formato, quindi
+      // canAccept() dice il vero mentre l'animazione va avanti. Il blocco era
+      // solo dell'interfaccia, e ~0,7 s a ogni tripletta spezzavano il ritmo.
+      this.clearing++;
       this.history = []; // l'undo non attraversa un match
       this.layout(before);
       this.flyToSlot(item, before.indexOf(item));
@@ -403,10 +452,20 @@ export class Game {
       this.items[m.index] = null;
     }
     this.cleared += matched.length;
+    this.clearing--;
     this.hud.setProgress(this.cleared, this.total);
     this.layout(this.tray.items);
 
-    if (this.pile.length === 0 && this.tray.size === 0) {
+    // Il verdetto è già stato dato altrove: non tornare indietro.
+    // Potendo prendere durante il pop, il giocatore può riempire il vassoio
+    // mentre l'animazione va: la sconfitta scatta a FLIGHT, questa callback a
+    // FLIGHT + CLEAR. Senza questa riga rimetterebbe PLAYING e lo
+    // resusciterebbe da sconfitto.
+    if (this.state === State.LOST || this.state === State.WON) return;
+
+    // `clearing` conta i pop ancora in volo: con due triplette sovrapposte la
+    // vittoria si dichiarerebbe mentre dei pezzi stanno ancora animando.
+    if (this.pile.length === 0 && this.tray.size === 0 && this.clearing === 0) {
       this.state = State.WON;
       this.hud.showResult('win', this.level);
       return;
@@ -623,7 +682,10 @@ export class Game {
           item.mesh.material = this.types[typeId].material;
         }
         // Cambiata la forma, cambia il collider: la pila si riassesta di conseguenza.
-        this.physics.setShapes(this.itemTypes, getHulls());
+        // Gli scafi vanno presi nella tavolozza del livello, non nell'elenco
+        // completo: gli id dei tipi sono densi (0..K-1) e la tavolozza è la
+        // sola cosa che li lega ai modelli veri.
+        this.physics.setShapes(this.itemTypes, this.palette.map((m) => getHulls()[m]));
         this.pendingSettle = true;
       },
     });
