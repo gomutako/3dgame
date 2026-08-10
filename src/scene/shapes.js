@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { MODELS } from './models.generated.js';
 
 /**
  * I tipi di oggetto: modelli con texture PBR dipinte (colore, normali, metallo,
@@ -14,22 +15,15 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
  *  · peso in scena — scartati ChronographWatch e ToyCar: 100.000 triangoli
  *    l'uno fanno 6 milioni di triangoli con 60 pezzi in scatola
  *
+ * Oggi quei tre filtri li applica `npm run check-model`, e l'elenco lo genera
+ * `scripts/sync-models.mjs` scandendo public/models/: per aggiungere un oggetto
+ * basta copiarci dentro il suo .glb.
+ *
  * Le texture originali erano 2048² per 59 MB in tutto: ridotte a 256², che a
  * questa distanza è più del necessario. I .glb qui sono quelli ricomposti.
  */
 
 export const ITEM_RADIUS = 0.44;
-
-// L'ordine conta: un livello usa i primi N tipi, quindi in testa vanno quelli
-// che si distinguono di più a colpo d'occhio.
-const MODELS = [
-  { file: 'Avocado', name: 'avocado' },
-  { file: 'BoomBox', name: 'stereo' },
-  { file: 'WaterBottle', name: 'borraccia' },
-  { file: 'AntiqueCamera', name: 'macchina fotografica' },
-  { file: 'Corset', name: 'corsetto' },
-  { file: 'SunglassesKhronos', name: 'occhiali da sole' },
-];
 
 export const TYPE_COUNT = MODELS.length;
 
@@ -84,13 +78,34 @@ function flatten(root) {
       const n = geometry.attributes.position.count;
       geometry.setAttribute('uv', new THREE.BufferAttribute(new Float32Array(n * 2), 2));
     }
+
+    // `gpuType` deve coincidere fra tutte le parti, altrimenti mergeGeometries
+    // rinuncia e restituisce null. Non è un caso di scuola: basta un modello
+    // con alcune mesh texturizzate e altre no — le UV vere arrivano dal
+    // caricatore senza gpuType, quelle inventate qui sopra ce l'hanno.
+    // Uniformarlo qui costa nulla e vale per qualunque modello si aggiunga.
+    for (const name of ['position', 'normal', 'uv']) {
+      const attribute = geometry.attributes[name];
+      if (attribute) attribute.gpuType = THREE.FloatType;
+    }
+
     parts.push(geometry);
     materials.push(Array.isArray(node.material) ? node.material[0] : node.material);
   });
 
   if (parts.length === 0) throw new Error('modello senza mesh');
   if (parts.length === 1) return { geometry: parts[0], material: materials[0] };
-  return { geometry: mergeGeometries(parts, true), material: materials };
+
+  const geometry = mergeGeometries(parts, true);
+  // Senza questo controllo il fallimento arriva molto più in là, come
+  // «Cannot read properties of null» dentro normalize(), che non dice nulla su
+  // quale modello sia il colpevole né perché.
+  if (!geometry) {
+    throw new Error(
+      `impossibile fondere le ${parts.length} mesh del modello: attributi incompatibili`
+    );
+  }
+  return { geometry, material: materials };
 }
 
 /** Centra la geometria e la scala perché la sfera contenitiva sia ITEM_RADIUS. */
@@ -118,9 +133,22 @@ export function getHulls(skin = 0.035) {
   // (scafo arrotondato): così l'ingombro fisico coincide con la forma disegnata.
   const k = (ITEM_RADIUS - skin) / ITEM_RADIUS;
   hulls = getItemTypes().map((t) => {
-    const src = t.geometry.attributes.position.array;
-    const out = new Float32Array(src.length);
-    for (let i = 0; i < src.length; i++) out[i] = src[i] * k;
+    const position = t.geometry.attributes.position;
+
+    // Va letto con getX/getY/getZ, non da `.array`.
+    //
+    // Con un buffer *interleaved* — posizione, normale e UV alternate nello
+    // stesso array — `.array` non contiene le sole posizioni: contiene tutto.
+    // Uno scafo costruito così nasce da normali e coordinate UV scambiate per
+    // punti nello spazio. Non è teoria: un modello scaricato aveva `count` 811
+    // e `array.length` 6488, cioè 811 × 8 (3 + 3 + 2), e produceva un collider
+    // che non somigliava alla forma — quando non faceva andare Rapier in panico.
+    const out = new Float32Array(position.count * 3);
+    for (let i = 0; i < position.count; i++) {
+      out[i * 3] = position.getX(i) * k;
+      out[i * 3 + 1] = position.getY(i) * k;
+      out[i * 3 + 2] = position.getZ(i) * k;
+    }
     return out;
   });
   return hulls;

@@ -14,7 +14,11 @@
     "verify:boosters": "node scripts/verify-boosters.mjs",
     "verify:physics": "node scripts/verify-physics.mjs",
     "check-model": "node scripts/check-model.mjs",
-    "prepare-model": "node scripts/prepare-model.mjs"
+    "prepare-model": "node scripts/prepare-model.mjs",
+    "models": "node scripts/sync-models.mjs",
+    "predev": "node scripts/sync-models.mjs",
+    "prebuild": "node scripts/sync-models.mjs",
+    "preverify": "node scripts/sync-models.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",
