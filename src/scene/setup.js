@@ -15,7 +15,26 @@ export const BOX = {
 
 const MARGIN = 0.25; // aria fra l'ultima colonna e la parete
 
-/** Colonne di spawn che entrano in una scatola di lato `size`. */
+/**
+ * Passo minimo fra due colonne di spawn: il diametro di un pezzo.
+ *
+ * Non coincide con CELL, che ci aggiunge un filo d'aria: due pezzi non si
+ * compenetrano finché i centri distano `2 · ITEM_RADIUS`. Sotto quella soglia
+ * nascono uno dentro l'altro e la simulazione li spara fuori dalla scatola
+ * (vedi il commento di `resetToSpawn` in physics.js). `PileWorld.spawn()`
+ * distribuisce le colonne su `size - 2 · ITEM_RADIUS`: è quella larghezza che
+ * va divisa, non il lato pieno.
+ */
+const MIN_PITCH = ITEM_RADIUS * 2;
+
+/**
+ * Colonne di spawn che entrano in una scatola di lato `size`.
+ *
+ * Mai meno di due, e non per estetica: con una sola colonna i pezzi nascono
+ * incolonnati, e 21 pezzi diventano una torre alta ~22 contro muri fisici alti
+ * `BOX.wallHeight` (9). Cadrebbero da sopra il bordo invece che dentro.
+ * È il vincolo che fissa il minimo di `computeBoxSize`.
+ */
 export function spawnColumns(size) {
   return Math.max(2, Math.floor((size - MARGIN) / CELL));
 }
@@ -34,7 +53,18 @@ const ITEM_FOOTPRINT = 0.62;
  */
 export function computeBoxSize(itemCount, layers = 3) {
   const side = Math.sqrt((itemCount * ITEM_FOOTPRINT) / layers);
-  return Math.min(6, Math.max(3, side + MARGIN));
+
+  // Il minimo è il lato che ospita DUE colonne di spawn a passo pieno: sotto,
+  // o i pezzi nascono compenetrati o restano incolonnati in una torre più alta
+  // dei muri (vedi spawnColumns).
+  //
+  // Era fissato a 3, e sui primi livelli vinceva sempre lui: con 21 pezzi il
+  // conto chiede 2,08 e la scatola restava a 3, cioè un solo strato e mezzo.
+  // Misurato prima della correzione: occlusione iniziale 0,0% ai livelli 1-2 —
+  // nessun pezzo copre nessun altro, quindi nessun puzzle spaziale, proprio la
+  // cosa che questo dimensionamento esiste per evitare.
+  const min = MIN_PITCH * 2 + ITEM_RADIUS * 2;
+  return Math.min(6, Math.max(min, side + MARGIN));
 }
 
 export const TRAY = {
