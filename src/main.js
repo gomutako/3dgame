@@ -22,18 +22,21 @@ await loadItemTypes();
 const game = new Game({ scene, camera, hud });
 
 /**
- * Le misure si prendono dal canvas, non da `window`.
+ * Misure della superficie di gioco.
  *
- * Su iOS `innerHeight` comprende l'area dietro le barre di Safari, mentre il
- * canvas — fisso a `inset: 0` — copre solo la parte visibile. Con quella
- * differenza succedono due cose insieme: l'inquadratura viene calcolata per un
- * aspetto che non è quello disegnato, e i tocchi vengono normalizzati su
- * un'altezza sbagliata, quindi il raggio parte accanto al dito e il pezzo non
- * si prende.
+ * La dimensione viene da `window`, non dal rettangolo del canvas: un canvas non
+ * ancora impaginato misura 300×150 — il suo default — e il renderer nascerebbe
+ * di quella taglia, disegnando il gioco in un francobollo in alto a sinistra.
+ * (Provato: succede davvero, l'HUD resta a posto perché è DOM e non dipende da
+ * questa misura.)
+ *
+ * L'origine invece viene dal canvas: serve a convertire le coordinate del
+ * puntatore. Con `position: fixed; inset: 0` è (0, 0), ma sottrarla non costa
+ * nulla e regge se un giorno il canvas non occupasse più tutto.
  */
 function viewport() {
   const r = canvas.getBoundingClientRect();
-  return { w: Math.max(1, r.width), h: Math.max(1, r.height), left: r.left, top: r.top };
+  return { w: Math.max(1, innerWidth), h: Math.max(1, innerHeight), left: r.left, top: r.top };
 }
 
 function resize() {
@@ -44,10 +47,8 @@ function resize() {
 }
 addEventListener('resize', resize);
 
-// Su iOS le barre di Safari compaiono e scompaiono cambiando l'altezza del
-// canvas SENZA un evento `resize` della finestra: senza questi due, il gioco
-// resta inquadrato per la geometria di prima.
-new ResizeObserver(resize).observe(canvas);
+// Su iOS le barre di Safari compaiono e scompaiono cambiando l'area visibile,
+// e non sempre lo accompagna un `resize` della finestra.
 visualViewport?.addEventListener('resize', resize);
 
 resize();

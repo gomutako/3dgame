@@ -177,14 +177,11 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
   distanza che tiene dentro pila, scatola e vassoio (con margine sotto per i pulsanti).
   Vale per qualsiasi proporzione di schermo — e siccome il grafo di occlusione nasce
   da questa camera, l'ordine è vincolante: misure → camera → generazione.
-- **Il canvas misura sé stesso, non la finestra.** Su iOS `innerHeight`
-  comprende l'area dietro le barre di Safari, mentre il canvas fisso a `inset: 0`
-  copre solo la parte visibile. Usare `innerWidth/innerHeight` per inquadratura e
-  coordinate del tocco produce due sintomi che sembrano scollegati: la scatola
-  inquadrata per un aspetto sbagliato, e i tocchi normalizzati su un'altezza che
-  non è quella disegnata — si tocca un pezzo e si prende il vuoto. Le barre poi
-  compaiono e scompaiono *senza* un evento `resize` della finestra: servono un
-  `ResizeObserver` sul canvas e l'ascolto di `visualViewport`.
+- **La dimensione viene da `window`, non dal rettangolo del canvas.** Provato al
+  contrario e rotto: un canvas non ancora impaginato misura 300×150 — il suo
+  default — e il renderer nasce di quella taglia, disegnando il gioco in un
+  francobollo in alto a sinistra mentre l'HUD, che è DOM, resta a posto. Dal
+  canvas si prende solo l'origine, per convertire le coordinate del puntatore.
 - **`touch-action: none` sul canvas, e `manipulation` non basta.** `manipulation`
   toglie solo il doppio-tap per lo zoom: pan e pinch restano al browser, che
   interpreta il trascinamento come gesto suo ed emette `pointercancel` — la
