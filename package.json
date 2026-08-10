@@ -1,0 +1,23 @@
+{
+  "name": "3dg",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Triple Match 3D puzzle prototype",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "verify": "node scripts/verify-levels.mjs 1 25 && node scripts/playthrough.mjs 1 15 && node scripts/verify-boosters.mjs 9",
+    "verify:levels": "node scripts/verify-levels.mjs",
+    "verify:play": "node scripts/playthrough.mjs",
+    "verify:boosters": "node scripts/verify-boosters.mjs"
+  },
+  "dependencies": {
+    "@dimforge/rapier3d-compat": "^0.20.0",
+    "three": "^0.185.1"
+  },
+  "devDependencies": {
+    "vite": "^8.2.1"
+  }
+}

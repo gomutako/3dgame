@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <title>3DG — Triple Match</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='10' cy='11' r='6' fill='%234ea1ff'/%3E%3Crect x='16' y='4' width='12' height='12' rx='2' fill='%23ff5c6c'/%3E%3Cpath d='M16 30 L10 19 L22 19 Z' fill='%23ffc23d'/%3E%3C/svg%3E" />
+  <link rel="stylesheet" href="/src/style.css" />
+</head>
+<body>
+  <div id="app">
+    <canvas id="scene"></canvas>
+
+    <header id="hud-top">
+      <div class="pill" id="level-pill">Livello <b id="level-num">1</b></div>
+      <div class="progress">
+        <div class="progress-bar"><i id="progress-fill"></i></div>
+        <span id="progress-label">0 / 0</span>
+      </div>
+    </header>
+
+    <footer id="hud-bottom">
+      <button class="booster" id="btn-undo"  title="Annulla l'ultima presa">↺<em id="undo-count">3</em></button>
+      <button class="booster" id="btn-hint"  title="Suggerimento">?<em id="hint-count">3</em></button>
+      <button class="booster" id="btn-shuffle" title="Rimescola i tipi">⇄<em id="shuffle-count">1</em></button>
+    </footer>
+
+    <div id="overlay" class="hidden">
+      <div class="card">
+        <h1 id="overlay-title">Livello completato</h1>
+        <p id="overlay-text">Ottimo lavoro.</p>
+        <button id="overlay-btn">Continua</button>
+      </div>
+    </div>
+
+    <div id="toast" class="hidden"></div>
+
+    <div id="loader"><div class="spinner"></div><span>Preparo il livello…</span></div>
+  </div>
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>
