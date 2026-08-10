@@ -30,7 +30,12 @@ const MAX_AWAKE = 2.5;     // secondi oltre i quali la pila viene messa a dormir
 export class PileWorld {
   constructor(count, rng) {
     this.count = count;
-    this.world = new RAPIER.World({ x: 0, y: -32, z: 0 });
+    // -16 invece di -32: circa 1,6× la gravità terrestre. Resta rapido — il
+    // livello deve partire in fretta — ma i pezzi non precipitano più come
+    // piombo. Più in basso l'assestamento si allunga, e il grafo di occlusione
+    // si ricostruisce solo a pila ferma: diventerebbe attesa fra una presa e
+    // l'altra.
+    this.world = new RAPIER.World({ x: 0, y: -16, z: 0 });
     this.world.timestep = STEP;
     this.bodies = new Array(count).fill(null);
     this.pose = new Float32Array(count * 7);
@@ -94,11 +99,20 @@ export class PileWorld {
       RAPIER.RigidBodyDesc.dynamic()
         .setTranslation(position.x, position.y, position.z)
         .setRotation(rotation)
-        .setLinearDamping(0.25)
-        .setAngularDamping(0.7)
+        // Smorzamento basso: il moto non muore a metà e gli oggetti rotolano
+        // invece di incollarsi dove atterrano.
+        .setLinearDamping(0.05)
+        .setAngularDamping(0.25)
     );
+    // Rimbalzo 0,12 contro lo 0,03 di prima: si sente che gli oggetti non sono
+    // di piombo. È la leva che costa più occlusione — un pezzo che rimbalza si
+    // allontana dalla pila invece di accatastarcisi — e a 0,20 la pila si
+    // appiattiva troppo. Misurato: occlusione iniziale media 17,2% a 0,20,
+    // 19,4% a 0,12, 20,4% a 0,06, contro 21,1% dello 0,03 originale.
+    // L'attrito, che sembrava la leva principale, non sposta nulla: fra 0,65 e
+    // 0,85 l'occlusione varia dell'1%, dentro il rumore.
     this.world.createCollider(
-      RAPIER.ColliderDesc.roundCuboid(h, h, h, border).setFriction(0.85).setRestitution(0.03),
+      RAPIER.ColliderDesc.roundCuboid(h, h, h, border).setFriction(0.75).setRestitution(0.12),
       body
     );
     this.bodies[index] = body;
@@ -200,7 +214,7 @@ export class PileWorld {
       // così l'ingombro finale coincide con la forma disegnata.
       const desc = RAPIER.ColliderDesc.roundConvexHull(hulls[type], HULL_SKIN);
       if (!desc) continue; // scafo degenere: tiene il collider precedente
-      this.world.createCollider(desc.setFriction(0.9).setRestitution(0.02), body);
+      this.world.createCollider(desc.setFriction(0.75).setRestitution(0.12), body);
       body.wakeUp();
     }
   }

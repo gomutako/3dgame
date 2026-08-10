@@ -22,9 +22,13 @@
  *    È il puzzle stesso. Meno attrito e più rimbalzo sparpagliano la pila, e
  *    senza sovrapposizione restano solo oggetti da toccare in ordine.
  *
- * Baseline al 2026-08-10, livelli 1-12: assestamento mediano 47 frame (0,78 s),
- * occlusione iniziale media 21,1%. (Prima di abbassare il minimo della scatola
- * era 16,5%, con i livelli 1-2 a zero.)
+ * Riferimento al 2026-08-10, livelli 1-12: assestamento mediano 46 frame
+ * (0,77 s), occlusione iniziale media 20,1%.
+ *
+ * Storia dei due numeri, perché dicono cosa è costato cosa:
+ *   16,5% · fisica pesante, scatola col minimo a 3 (livelli 1-2 a occlusione 0)
+ *   21,1% · dopo aver abbassato il minimo della scatola a 2,64
+ *   20,1% · dopo la fisica più leggera — un punto pagato al rimbalzo
  */
 import * as THREE from 'three';
 import { setupHeadless, silentHud } from './headless.mjs';
