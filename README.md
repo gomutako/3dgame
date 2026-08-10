@@ -26,6 +26,7 @@ npm run verify:levels 1 30  # ogni livello è generato risolvibile e bilanciato
 npm run verify:play 1 20    # un giocatore automatico porta a termine i livelli
 npm run verify:play 1 20 --ruota   # idem, girando la scatola fra una presa e l'altra
 npm run verify:boosters 9   # undo, hint, shuffle
+npm run verify:physics 1 12 # nessun pezzo sprofonda nel fondo della scatola
 ```
 
 `verify:levels` è la rete di sicurezza più importante: un livello impossibile

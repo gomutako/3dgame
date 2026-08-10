@@ -89,8 +89,17 @@ avesse chiuso ogni strada, i tipi dei pezzi rimasti vengono ridistribuiti d'uffi
 
 ## 5. Decisioni di design non ovvie
 
+- **Svegliare tutta la pila, non i vicini.** Sembra uno spreco e non lo è. Un corpo che
+  perde l'appoggio ma resta marcato dormiente riceve da Rapier l'integrazione della
+  gravità **senza** le forze di contatto: cade libero attraverso il fondo finché il
+  motore non lo sveglia da sé — sullo schermo sprofonda sotto il piano e poi risale di
+  scatto, e nei casi peggiori esce dal mondo. Con un raggio fisso il bug è inevitabile,
+  perché la catena degli appoggi è più lunga della distanza: misurato 1,709 contro un
+  raggio di 1,496. Svegliare tutto costa *meno*, non di più — quei tuffi erano movimento
+  spurio da simulare, e lo spostamento totale al livello 15 scende da 559 a 38.
+  Guardia: `npm run verify:physics`.
 - **Fisica viva per tutto il livello.** Il mondo Rapier non si spegne dopo la caduta:
-  togliere un pezzo toglie il suo corpo rigido e sveglia i vicini, che franano. È ciò che
+  togliere un pezzo toglie il suo corpo rigido e sveglia la pila, che frana. È ciò che
   rende la pila una *massa* e non un diorama. Il prezzo è che il grafo di occlusione
   scade in continuazione — pagato ricostruendolo a ogni assestamento (§4.6). Il costo
   reale è ~5 ms per frana: la garanzia di risolvibilità sopravvive alla fisica invece di
