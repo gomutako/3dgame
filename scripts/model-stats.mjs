@@ -12,7 +12,7 @@
  * che si deducono da CREDITS.md — avrebbe respinto metà del set che funziona
  * da sempre.
  */
-import { NodeIO } from '@gltf-transform/core';
+import { NodeIO, Logger } from '@gltf-transform/core';
 import { statSync } from 'node:fs';
 
 export const LIMITS = {
@@ -27,7 +27,11 @@ export const LIMITS = {
 };
 
 export async function readStats(file) {
-  const doc = await new NodeIO().read(file);
+  // Senza, ogni lettura stampa un avviso per ogni estensione glTF non
+  // registrata: rumore a ogni `npm run dev`, e nessuna di quelle estensioni
+  // serve alle misure.
+  const io = new NodeIO().setLogger(new Logger(Logger.Verbosity.ERROR));
+  const doc = await io.read(file);
   const root = doc.getRoot();
 
   let triangles = 0;

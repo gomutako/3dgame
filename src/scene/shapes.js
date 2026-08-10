@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
+import { ConvexGeometry } from 'three/examples/jsm/geometries/ConvexGeometry.js';
 import { MODELS } from './models.generated.js';
 
 /**
@@ -29,6 +30,7 @@ export const TYPE_COUNT = MODELS.length;
 
 let types = null;
 let hulls = null;
+let pickGeometries = null;
 
 /**
  * Carica i modelli. Va attesa prima di costruire il gioco.
@@ -152,4 +154,30 @@ export function getHulls(skin = 0.035) {
     return out;
   });
   return hulls;
+}
+
+/**
+ * Geometrie per il bersaglio del dito: lo scafo convesso di ogni tipo.
+ *
+ * Perché non la mesh disegnata: `normalize()` pareggia la *sfera* contenitiva,
+ * non l'area della silhouette. Un oggetto pieno riempie la sua sfera; uno fatto
+ * per lo più di vuoto — una montatura di occhiali, il manico di una tazza — ne
+ * occupa una frazione, e diventa un bersaglio molto più piccolo a parità di
+ * ingombro nominale. Lo scafo convesso è la stessa forma che la fisica usa per
+ * il collider, quindi il dito prende ciò che il pezzo occupa davvero.
+ *
+ * Sono invisibili: stanno sul layer 1, che la camera non disegna.
+ */
+export function getPickGeometries() {
+  if (pickGeometries) return pickGeometries;
+
+  pickGeometries = getItemTypes().map((t) => {
+    const p = t.geometry.attributes.position;
+    const points = new Array(p.count);
+    for (let i = 0; i < p.count; i++) {
+      points[i] = new THREE.Vector3(p.getX(i), p.getY(i), p.getZ(i));
+    }
+    return new ConvexGeometry(points);
+  });
+  return pickGeometries;
 }

@@ -3,15 +3,20 @@
 // copiare il suo .glb in public/models/. Entrano solo quelli che passano
 // check-model.
 export const MODELS = [
-  { file: 'AntiqueCamera', name: 'macchina fotografica' },
+  { file: '3d_demo_30', name: '3d demo 30' },
   { file: 'Avocado', name: 'avocado' },
   { file: 'BoomBox', name: 'stereo' },
   { file: 'Corset', name: 'corsetto' },
-  { file: 'Dice', name: 'dado' },
+  { file: 'Hex-Dumbell', name: 'hex dumbell' },
   { file: 'Rubik', name: 'cubo di Rubik' },
-  { file: 'SunglassesKhronos', name: 'occhiali da sole' },
+  { file: 'TEA', name: 'tea' },
   { file: 'WaterBottle', name: 'borraccia' },
-  { file: 'basketball', name: 'pallone' },
-  { file: 'blackberry', name: 'mora' },
-  { file: 'strawberry_LP', name: 'fragola' },
+  { file: 'flashlight', name: 'flashlight' },
+  { file: 'lantern', name: 'lantern' },
+  { file: 'mastertux-cup-209', name: 'mastertux cup 209' },
+  { file: 'mastertux-vase-1546', name: 'mastertux vase 1546' },
+  { file: 'mastertux-water-polo-62', name: 'mastertux water polo 62' },
+  { file: 'tiny_planet_friends_3d-packaging-2922', name: 'tiny planet friends 3d packaging 2922' },
+  { file: 'vase', name: 'vase' },
+  { file: 'wings_of_freedom-bell-3055', name: 'wings of freedom bell 3055' },
 ];

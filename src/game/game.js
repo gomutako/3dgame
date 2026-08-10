@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { getItemTypes, getHulls } from '../scene/shapes.js';
+import { getItemTypes, getHulls, getPickGeometries } from '../scene/shapes.js';
 import { traySlotPosition, layoutWorld, computeBoxSize, getArena, TRAY } from '../scene/setup.js';
 import { levelConfig } from '../core/levels.js';
 import { Rng, levelSeed } from '../core/rng.js';
@@ -30,9 +30,11 @@ export class Game {
     this.seed = seed;
 
     this.allTypes = getItemTypes();
+    this.allPickGeometries = getPickGeometries();
     // Rimpiazzata a ogni livello dalla tavolozza estratta in generateLevel:
     // i tipi non sono più sempre i primi N modelli dell'elenco.
     this.types = this.allTypes;
+    this.pickGeometries = this.allPickGeometries;
     this.state = State.LOADING;
     this.level = 1;
 
@@ -62,6 +64,9 @@ export class Game {
     this.settles = 0;
 
     this.raycaster = new THREE.Raycaster();
+    // I bersagli del dito stanno sul layer 1 per non essere disegnati; senza
+    // questa riga il raycaster, che di suo guarda solo il layer 0, non li vede.
+    this.raycaster.layers.enable(1);
     this.pointer = new THREE.Vector2();
   }
 
@@ -96,6 +101,7 @@ export class Game {
     this.itemTypes = data.types;
     this.palette = data.palette;
     this.types = this.palette.map((m) => this.allTypes[m]);
+    this.pickGeometries = this.palette.map((m) => this.allPickGeometries[m]);
     this.itemCount = cfg.itemCount;
     this.autoReshuffles = 0;
     this.settles = 0;
@@ -127,8 +133,20 @@ export class Game {
     mesh.matrixAutoUpdate = true;
     this.group.add(mesh);
 
-    const item = { index, type: typeId, mesh, state: 'pile', home: null, tween: null };
+    const item = { index, type: typeId, mesh, pick: null, state: 'pile', home: null, tween: null };
     mesh.userData.item = item;
+
+    // Bersaglio del dito: lo scafo convesso, invisibile, figlio della mesh —
+    // così segue posizione e rotazione senza codice di sincronizzazione.
+    // Il layer 1 lo tiene fuori dal rendering: la camera disegna solo il layer 0.
+    const pick = new THREE.Mesh(this.pickGeometries[typeId]);
+    pick.layers.set(1);
+    pick.castShadow = false;
+    pick.receiveShadow = false;
+    pick.userData.item = item;
+    mesh.add(pick);
+    item.pick = pick;
+
     return item;
   }
 
@@ -313,24 +331,42 @@ export class Game {
   pickAt(clientX, clientY, width, height) {
     if (this.state !== State.PLAYING || !this.tray.canAccept()) return null;
 
-    this.pointer.set((clientX / width) * 2 - 1, -(clientY / height) * 2 + 1);
-    this.raycaster.setFromCamera(this.pointer, this.camera);
-
-    const hits = this.castAtPile();
+    const hits = this.castAtScreen(clientX, clientY, width, height);
     if (hits.length === 0) return null;
 
     this.take(hits[0].object.userData.item);
     return hits[0].object.userData.item;
   }
 
+  /** Raycast da un punto dello schermo. */
+  castAtScreen(clientX, clientY, width, height) {
+    this.pointer.set((clientX / width) * 2 - 1, -(clientY / height) * 2 + 1);
+    this.raycaster.setFromCamera(this.pointer, this.camera);
+    return this.castAtPile();
+  }
+
   /**
-   * Raycast contro la pila. Aggiorna prima le matrici del grafo di scena:
-   * nel browser lo farebbe il renderer, ma questo codice gira anche headless
-   * negli harness, dove nessuno disegna nulla.
+   * Raycast contro la pila, col raggio già impostato dal chiamante.
+   *
+   * Mira agli **scafi convessi**, non alle mesh disegnate. Il motivo è che
+   * `normalize()` pareggia la *sfera* contenitiva, non l'area della silhouette:
+   * un dado riempie la sua sfera, un paio di occhiali — che è per lo più vuoto —
+   * ne occupa un settimo. Col raycast sulla mesh dettagliata il dito deve
+   * infilare la montatura, e il raggio che passa nel buco fra le lenti prende il
+   * pezzo dietro. Misurato sui livelli 3-10: gli occhiali si prendevano nel 28%
+   * dei casi contro il 93% del dado; mirando allo scafo, 76% contro 87%.
+   *
+   * Lo scafo convesso è anche la forma con cui il pezzo si comporta davvero
+   * nella pila — è il collider di Rapier — quindi il dito prende esattamente
+   * l'ingombro che il giocatore vede spingere e franare.
+   *
+   * Aggiorna prima le matrici del grafo di scena: nel browser lo farebbe il
+   * renderer, ma questo codice gira anche headless negli harness, dove nessuno
+   * disegna nulla.
    */
   castAtPile() {
     this.arena.updateMatrixWorld(true);
-    return this.raycaster.intersectObjects(this.pile.map((i) => i.mesh), false);
+    return this.raycaster.intersectObjects(this.pile.map((i) => i.pick), false);
   }
 
   take(item) {
