@@ -1,0 +1,26 @@
+# Cloudflare Workers — header per path.
+#
+# La distinzione che conta è fra ciò che passa dalla pipeline di Vite e ciò
+# che no. Vite mette l'hash nel nome solo al primo gruppo.
+
+# Il punto d'ingresso: se resta in cache, dopo un deploy il browser continua a
+# chiedere i bundle vecchi.
+#
+# La regola va su `/`, NON su `/index.html`: Cloudflare normalizza il secondo
+# nel primo con un 307, quindi una regola su `/index.html` finirebbe sul
+# redirect e non sulla pagina — verificato con `wrangler dev`.
+/
+  Cache-Control: no-cache
+
+# Nomi con hash: il contenuto non può cambiare a parità di nome, quindi la
+# cache può essere eterna.
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# I .glb stanno in public/ e Vite li copia SENZA hash: il nome resta lo
+# stesso anche se il modello cambia. Una cache immutabile qui significherebbe
+# che un modello corretto non raggiunge più chi ha già visitato il sito.
+# Un giorno è il compromesso: 3,5 MB non riscaricati a ogni partita, e una
+# modifica si propaga da sola entro 24 ore.
+/models/*
+  Cache-Control: public, max-age=86400
