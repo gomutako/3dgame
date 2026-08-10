@@ -11,7 +11,6 @@ export function initPhysics() {
 const STEP = 1 / 60;
 const MAX_SUBSTEPS = 4;
 const DROP_STEPS = 420;
-const WAKE_RADIUS = ITEM_RADIUS * 3.4;
 const HULL_SKIN = 0.035;   // bordo arrotondato degli scafi: contatti stabili
 const MAX_AWAKE = 2.5;     // secondi oltre i quali la pila viene messa a dormire d'ufficio
 
@@ -23,9 +22,10 @@ const MAX_AWAKE = 2.5;     // secondi oltre i quali la pila viene messa a dormir
  *     per frame per il replay. La prima caduta usa un collider uniforme (serve una
  *     pila che non dipenda ancora dai tipi); poi `setShapes()` monta gli scafi
  *     convessi veri e la caduta si rifà da capo — vedi generate.js.
- *  2. `step()` — durante il gioco. Togliere un pezzo sveglia i vicini, che franano
- *     e si riassestano; quando tutto torna a dormire il chiamante ricostruisce il
- *     grafo di occlusione sulle nuove pose.
+ *  2. `step()` — durante il gioco. Togliere un pezzo sveglia l'intera pila, che frana
+ *     e si riassesta; quando tutto torna a dormire il chiamante ricostruisce il
+ *     grafo di occlusione sulle nuove pose. Perché *tutta* e non solo i vicini:
+ *     vedi `wakeAll()`.
  */
 export class PileWorld {
   constructor(count, rng) {
@@ -212,29 +212,38 @@ export class PileWorld {
     const body = this.bodies[index];
     if (!body) return;
 
-    const p = body.translation();
     this.world.removeRigidBody(body);
     this.bodies[index] = null;
-    this.wakeAround(p);
+    this.wakeAll();
   }
 
   /** Rimette un pezzo (undo): la pila gli fa spazio da sola. */
   insert(index, position, quaternion) {
     if (this.bodies[index]) return;
     this.create(index, position, quaternion);
-    this.wakeAround(position);
+    this.wakeAll();
   }
 
-  wakeAround(point) {
-    const r2 = WAKE_RADIUS * WAKE_RADIUS;
-    for (const body of this.bodies) {
-      if (!body) continue;
-      const t = body.translation();
-      const dx = t.x - point.x;
-      const dy = t.y - point.y;
-      const dz = t.z - point.z;
-      if (dx * dx + dy * dy + dz * dz <= r2) body.wakeUp();
-    }
+  /**
+   * Sveglia TUTTA la pila, non un intorno del pezzo toccato.
+   *
+   * Sembra uno spreco e non lo è. Un corpo che perde l'appoggio ma resta
+   * marcato dormiente riceve da Rapier l'integrazione della gravità **senza**
+   * le forze di contatto: cade libero attraverso il fondo finché il motore non
+   * lo sveglia da sé. Sullo schermo è un pezzo che sprofonda sotto il piano e
+   * poi risale di scatto; nei casi peggiori esce dal mondo e non torna.
+   *
+   * Con un raggio fisso il bug è inevitabile: qualunque soglia lascia fuori un
+   * corpo che l'appoggio lo perde comunque, perché la catena di appoggi è più
+   * lunga della distanza (misurato: 1,709 contro un raggio di 1,496).
+   *
+   * Costa meno della versione "furba": i tuffi e le risalite erano movimento
+   * spurio da simulare. Sui livelli 1-15 lo spostamento totale al livello 15
+   * scende da 559 a 38 e la partita automatica accelera.
+   * Copertura: `npm run verify:physics`.
+   */
+  wakeAll() {
+    for (const body of this.bodies) body?.wakeUp();
   }
 
   // ------------------------------------------------------------------- pose

@@ -8,10 +8,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "verify": "node scripts/verify-levels.mjs 1 25 && node scripts/playthrough.mjs 1 15 && node scripts/verify-boosters.mjs 9",
+    "verify": "node scripts/verify-levels.mjs 1 25 && node scripts/playthrough.mjs 1 15 && node scripts/verify-boosters.mjs 9 && node scripts/verify-physics.mjs 1 12",
     "verify:levels": "node scripts/verify-levels.mjs",
     "verify:play": "node scripts/playthrough.mjs",
-    "verify:boosters": "node scripts/verify-boosters.mjs"
+    "verify:boosters": "node scripts/verify-boosters.mjs",
+    "verify:physics": "node scripts/verify-physics.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",
