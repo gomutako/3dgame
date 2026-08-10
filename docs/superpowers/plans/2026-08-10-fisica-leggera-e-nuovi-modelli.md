@@ -16,7 +16,9 @@
 - **Soglia di rifiuto: occlusione media sotto il 25%.** Se le costanti nuove la fanno scendere sotto, vanno corrette — l'attrito è la leva che la governa di più, la gravità la seconda.
 - Le quattro suite di `npm run verify` devono restare verdi: `verify:levels` (ogni livello risolvibile), `verify:play` (un giocatore automatico li completa), `verify:boosters`, `verify:physics` (nessun pezzo sotto il piano).
 - **La massa non va toccata:** in un corpo rigido non cambia la velocità di caduta. Chi propone di abbassare la densità ha capito male il problema.
-- Non alzare `TYPE_COUNT`, non toccare `src/core/levels.js`, non rifare i sei `.glb` già in `public/models/`.
+- Non toccare `src/core/levels.js` e non rifare i sei `.glb` già in `public/models/`.
+- `TYPE_COUNT` diventa **dinamico** (Task 5): è il numero di file in `public/models/`. Nessun tetto alla difficoltà per ora — decisione presa dall'utente, ma l'impatto va **misurato** con `verify:play` quando i modelli nuovi esisteranno, e i numeri riportati prima di lasciarlo così.
+- Il random della tavolozza (Task 6) deve essere **seminato dall'rng del livello**: `README.md` e `DESIGN.md` §7 garantiscono che `(seed, livello)` dia un livello identico, e le quattro suite hanno senso solo grazie a questo.
 - Lingua di commenti, documentazione e commit: **italiano**.
 - Branch di lavoro `develop`; la produzione è `master` via pull request.
 
@@ -28,9 +30,14 @@
 | `src/level/physics.js` | modificare | gravità, `restitution`, damping, `friction`, `DROP_STEPS` |
 | `scripts/check-model.mjs` | creare | referto su un `.glb`, verdetto passa/non passa |
 | `scripts/prepare-model.mjs` | creare | conversione + decimazione + riduzione texture, poi referto |
-| `package.json` | modificare | script `check-model`, `prepare-model`; dipendenze di sviluppo |
-| `DESIGN.md` | modificare | §3 e §5: costanti nuove, e il residuo dei «12 modelli» |
-| `README.md` | modificare | i due comandi nuovi |
+| `scripts/sync-models.mjs` | creare | genera il manifest scandendo `public/models/` |
+| `src/scene/models.generated.js` | creare (generato, versionato) | l'elenco dei modelli, leggibile sia da Vite sia da Node |
+| `src/scene/shapes.js` | modificare | importa il manifest invece dell'elenco scritto a mano |
+| `src/level/generate.js` | modificare | estrae la tavolozza del livello dal suo rng |
+| `src/game/game.js` | modificare | mesh e scafi presi dalla tavolozza, non dall'elenco completo |
+| `package.json` | modificare | script `check-model`, `prepare-model`, `models` + hook `pre*`; dipendenze di sviluppo |
+| `DESIGN.md` | modificare | §3 e §5: costanti nuove, tavolozza per livello, e il residuo dei «12 modelli» |
+| `README.md` | modificare | i comandi nuovi e come si aggiunge un oggetto |
 
 ---
 
@@ -551,7 +558,277 @@ Blender non è richiesto."
 
 ---
 
-### Task 5: Documentazione
+### Task 5: Manifest automatico dei modelli
+
+L'utente copia `.glb` in `public/models/` e devono comparire nel gioco senza toccare il codice.
+
+`import.meta.glob` **non** è utilizzabile: è una trasformazione di Vite, ma `src/scene/shapes.js` è importato anche da `scripts/headless.mjs`, che gira in Node puro per le quattro suite. Serve un manifest generato, importabile da entrambi.
+
+**Files:**
+- Create: `scripts/sync-models.mjs`
+- Create: `src/scene/models.generated.js` (prodotto dallo script, versionato)
+- Modify: `src/scene/shapes.js:25-34`
+- Modify: `package.json`
+
+**Interfaces:**
+- Produces: `src/scene/models.generated.js` esporta `export const MODELS = [{ file, name }, ...]`. `shapes.js` lo importa al posto della costante scritta a mano; `TYPE_COUNT` resta `MODELS.length`.
+
+- [ ] **Step 1: Scrivere lo script di sincronizzazione**
+
+Creare `scripts/sync-models.mjs`:
+
+```js
+/**
+ * Genera src/scene/models.generated.js scandendo public/models/.
+ *
+ * Perché un file generato e non `import.meta.glob`: quest'ultimo è una
+ * trasformazione di Vite, ma shapes.js viene importato anche da
+ * scripts/headless.mjs, che gira in Node puro per le verifiche. Un modulo
+ * generato lo leggono entrambi.
+ *
+ * Gira da solo prima di `dev`, `build` e delle verifiche: copiare un .glb
+ * nella cartella basta.
+ */
+import { readdirSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+
+const MODELS_DIR = fileURLToPath(new URL('../public/models/', import.meta.url));
+const OUT = fileURLToPath(new URL('../src/scene/models.generated.js', import.meta.url));
+
+// Nomi italiani per i modelli storici: dal nome del file non si deducono.
+const KNOWN = {
+  Avocado: 'avocado',
+  BoomBox: 'stereo',
+  WaterBottle: 'borraccia',
+  AntiqueCamera: 'macchina fotografica',
+  Corset: 'corsetto',
+  SunglassesKhronos: 'occhiali da sole',
+};
+
+const files = readdirSync(MODELS_DIR)
+  .filter((f) => f.toLowerCase().endsWith('.glb'))
+  .map((f) => f.slice(0, -4))
+  .sort();
+
+if (files.length === 0) {
+  console.error('Nessun .glb in public/models/: il gioco non avrebbe tipi.');
+  process.exit(1);
+}
+
+const entries = files.map((file) => {
+  // Dal nome del file: "RedStrawberry" o "red_strawberry" → "red strawberry".
+  const fallback = file
+    .replace(/[_-]+/g, ' ')
+    .replace(/([a-z\d])([A-Z])/g, '$1 $2')
+    .toLowerCase()
+    .trim();
+  return { file, name: KNOWN[file] ?? fallback };
+});
+
+const body = `// GENERATO da scripts/sync-models.mjs — non modificare a mano.
+// Si rigenera da solo prima di dev, build e verifiche: per aggiungere un
+// oggetto basta copiare il suo .glb in public/models/.
+export const MODELS = [
+${entries.map((e) => `  { file: '${e.file}', name: '${e.name}' },`).join('\n')}
+];
+`;
+
+const before = existsSync(OUT) ? readFileSync(OUT, 'utf8') : '';
+if (before !== body) {
+  writeFileSync(OUT, body);
+  console.log(`models.generated.js: ${entries.length} modelli`);
+}
+```
+
+- [ ] **Step 2: Far leggere il manifest a shapes.js**
+
+In `src/scene/shapes.js`, sostituire il blocco `const MODELS = [...]` (righe 25-32) con:
+
+```js
+// L'elenco lo genera scripts/sync-models.mjs scandendo public/models/:
+// per aggiungere un oggetto basta copiarci dentro il suo .glb.
+import { MODELS } from './models.generated.js';
+```
+
+L'import va spostato in cima al file, insieme agli altri. La riga
+`export const TYPE_COUNT = MODELS.length;` resta invariata.
+
+Aggiornare anche il commento del blocco che parlava dell'ordine per contrasto
+decrescente: quell'ordine non esiste più (vedi Task 6), la tavolozza è per livello.
+
+- [ ] **Step 3: Agganciarlo ai comandi**
+
+In `package.json`, dentro `"scripts"`, aggiungere:
+
+```json
+    "models": "node scripts/sync-models.mjs",
+    "predev": "node scripts/sync-models.mjs",
+    "prebuild": "node scripts/sync-models.mjs",
+    "preverify": "node scripts/sync-models.mjs",
+```
+
+- [ ] **Step 4: Generare e verificare che nulla cambi**
+
+Run: `npm run models`
+Expected: scrive `src/scene/models.generated.js` con **6** modelli.
+
+Run: `cat src/scene/models.generated.js`
+Expected: i sei nomi italiani corretti (`avocado`, `stereo`, `borraccia`, `macchina fotografica`, `corsetto`, `occhiali da sole`), presi da `KNOWN`.
+
+- [ ] **Step 5: Le suite devono restare verdi**
+
+Run: `npm run verify`
+Expected: exit 0. È il controllo che conta: dimostra che il manifest funziona **anche in Node puro**, che è l'intero motivo per cui esiste invece di `import.meta.glob`.
+
+- [ ] **Step 6: Provare l'aggiunta di un file**
+
+```bash
+cp public/models/Avocado.glb public/models/ProvaAggiunta.glb
+npm run models
+grep -c "file:" src/scene/models.generated.js   # atteso: 7
+rm public/models/ProvaAggiunta.glb
+npm run models
+grep -c "file:" src/scene/models.generated.js   # atteso: 6
+```
+
+Expected: 7 poi 6, e il nome derivato per `ProvaAggiunta` è `prova aggiunta`.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add scripts/sync-models.mjs src/scene/models.generated.js src/scene/shapes.js package.json
+git commit -m "feat: i modelli si caricano da soli da public/models/
+
+Un manifest generato, non import.meta.glob: shapes.js è importato anche da
+headless.mjs, che gira in Node puro per le verifiche, dove la trasformazione
+di Vite non esiste. Si rigenera prima di dev, build e verify."
+```
+
+---
+
+### Task 6: Tavolozza casuale per livello
+
+Richiesta: i tipi mescolati, non sempre i primi N. Ma il random deve essere **seminato**: `README.md` e `DESIGN.md` §7 garantiscono che `(seed, livello)` dia un livello identico, e le quattro suite hanno senso solo grazie a questo.
+
+Oggi un livello usa i tipi `0..K-1`, cioè sempre i primi K modelli. La tavolozza li rimpiazza con un sottoinsieme estratto dal rng del livello: il livello 7 mostra sempre gli stessi oggetti, diversi da quelli dell'8.
+
+**Files:**
+- Modify: `src/level/generate.js:46` e il valore di ritorno
+- Modify: `src/game/game.js:32`, `:93`, `:626`
+
+**Interfaces:**
+- Consumes: `getItemTypes()`, `getHulls()` da `shapes.js`; `rng.next()`.
+- Produces: `generateLevel()` restituisce in più `palette` — `Int32Array` di lunghezza `typeCount`, dove `palette[k]` è l'indice del modello usato dal tipo `k` del livello.
+
+- [ ] **Step 1: Estrarre la tavolozza in generate.js**
+
+In `src/level/generate.js`, sostituire la riga `const hulls = getHulls();` con:
+
+```js
+  // Tavolozza del livello: quali modelli rappresentano i tipi 0..typeCount-1.
+  // Estratta dal rng del livello, quindi (seed, livello) resta riproducibile —
+  // senza, le quattro suite girerebbero ogni volta su un livello diverso.
+  const allHulls = getHulls();
+  const palette = pickPalette(allHulls.length, typeCount, rng);
+  const hulls = palette.map((m) => allHulls[m]);
+```
+
+In fondo al file aggiungere:
+
+```js
+/** Sottoinsieme di `count` modelli su `total`, senza ripetizioni (Fisher-Yates). */
+function pickPalette(total, count, rng) {
+  const pool = Int32Array.from({ length: total }, (_, i) => i);
+  for (let i = total - 1; i > 0; i--) {
+    const j = Math.floor(rng.next() * (i + 1));
+    const t = pool[i]; pool[i] = pool[j]; pool[j] = t;
+  }
+  return Array.from(pool.slice(0, count));
+}
+```
+
+Aggiungere `palette` all'oggetto restituito da `generateLevel`, accanto a `types`.
+
+- [ ] **Step 2: Far usare la tavolozza alle mesh**
+
+In `src/game/game.js`, alla riga 32 sostituire `this.types = getItemTypes();` con:
+
+```js
+    this.allTypes = getItemTypes();
+    this.types = this.allTypes;   // rimpiazzata a ogni livello dalla tavolozza
+```
+
+Dove oggi c'è `this.itemTypes = data.types;` (riga 93) aggiungere subito sotto:
+
+```js
+    this.palette = data.palette;
+    this.types = this.palette.map((m) => this.allTypes[m]);
+```
+
+- [ ] **Step 3: Allineare il booster shuffle**
+
+Alla riga 626 `this.physics.setShapes(this.itemTypes, getHulls());` sostituire con:
+
+```js
+        // Gli scafi vanno presi nella tavolozza del livello, non nell'elenco
+        // completo: gli id dei tipi sono densi (0..K-1) e la tavolozza è la
+        // sola cosa che li lega ai modelli veri.
+        this.physics.setShapes(this.itemTypes, this.palette.map((m) => getHulls()[m]));
+```
+
+- [ ] **Step 4: Verificare che la riproducibilità tenga**
+
+Run: `npm run verify:levels 1 25`
+Expected: PASS. Se un livello risultasse irrisolvibile, la tavolozza non c'entra: i tipi restano densi `0..K-1` e il solver non guarda i modelli.
+
+Run due volte: `npm run verify:play 3 3` e di nuovo `npm run verify:play 3 3`
+Expected: **output identico**. È la prova che il random è seminato. Se cambia, `pickPalette` sta usando una fonte di casualità diversa dall'rng del livello.
+
+- [ ] **Step 5: Verificare che livelli diversi peschino modelli diversi**
+
+```bash
+node -e "
+import('./scripts/headless.mjs').then(async (h) => {
+  await h.setupHeadless();
+  const { levelConfig } = await import('./src/core/levels.js');
+  const { generateLevel } = await import('./src/level/generate.js');
+  const { createCamera } = await import('./src/scene/setup.js');
+  const { Rng } = await import('./src/core/rng.js');
+  for (const l of [3, 4, 5]) {
+    const d = await generateLevel(levelConfig(l), createCamera(0.5), new Rng(l));
+    console.log('livello', l, 'tavolozza', d.palette.join(','));
+  }
+});
+"
+```
+
+Expected: tre tavolozze **diverse** fra loro. Se sono identiche, l'rng non sta variando col livello.
+
+⚠️ Se `Rng` non si esporta con quel nome, leggere `src/core/rng.js` e usare quello vero: il punto del controllo è confrontare tre livelli, non la firma del costruttore.
+
+- [ ] **Step 6: Suite completa**
+
+Run: `npm run verify`
+Expected: exit 0, tutte e quattro verdi.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/level/generate.js src/game/game.js
+git commit -m "feat: ogni livello pesca la sua tavolozza di modelli
+
+I tipi non sono più sempre i primi N: ogni livello estrae il suo
+sottoinsieme dal proprio rng. Seminato, non casuale a ogni avvio — README e
+DESIGN garantiscono che (seed, livello) dia un livello identico, ed è la
+base su cui le quattro suite hanno senso.
+
+Si perde l'ordinamento per contrasto decrescente: un livello basso può
+pescare silhouette simili. Scelta esplicita, reversibile nel manifest."
+```
+
+---
+
+### Task 7: Documentazione
 
 **Files:**
 - Modify: `DESIGN.md`
@@ -629,7 +906,7 @@ Kenney: i modelli sono 6, quindi la leva della varietà è ferma dal livello 6."
 
 ---
 
-### Task 6: Rilascio
+### Task 8: Rilascio
 
 - [ ] **Step 1: Suite completa**
 

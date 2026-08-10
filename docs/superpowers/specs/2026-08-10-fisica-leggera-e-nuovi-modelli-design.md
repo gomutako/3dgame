@@ -166,6 +166,50 @@ e non misurabili:
   marchi. È il filtro che ha già escluso DamagedHelmet (CC BY-NC) e Duck
   (licenza proprietaria Sony).
 
+## 5.5 Caricamento automatico e tavolozza per livello
+
+Richiesta emersa in corso d'opera: l'utente scarica `.glb` e vuole che vengano
+caricati **tutti** quelli presenti, senza toccare il codice, e che i tipi siano
+**mescolati** invece di seguire un ordine fisso.
+
+### Perché non basta `import.meta.glob`
+
+È una trasformazione di Vite, ma `src/scene/shapes.js` è importato anche da
+`scripts/headless.mjs`, che gira in **Node puro** per le quattro suite di
+verifica. Lì `import.meta.glob` non esiste: le suite si romperebbero.
+
+**Soluzione:** uno script genera un manifest importabile da entrambi gli
+ambienti, agganciato a `predev` e `prebuild` perché resti automatico dal punto di
+vista dell'utente — copia il file nella cartella, lancia `npm run dev`, c'è.
+
+### Il random deve essere seminato
+
+`README.md` e `DESIGN.md` §7 garantiscono che `(seed, numero livello)` produca un
+livello identico, e le quattro suite hanno senso solo grazie a questo: un test
+che gira su un livello diverso a ogni esecuzione non verifica nulla.
+
+**Quindi:** ogni livello estrae la sua tavolozza di modelli **dal proprio rng
+seminato**. Il livello 7 mostra sempre gli stessi oggetti, diversi da quelli
+dell'8. Variabilità fra i livelli, riproducibilità dentro il livello.
+
+### Cosa si perde, dichiarato
+
+L'ordinamento per contrasto decrescente (`DESIGN.md` §5: «un livello usa i primi
+N tipi, quindi in testa vanno quelli che si distinguono di più»). Con la
+tavolozza casuale un livello basso può pescare tre oggetti dalle silhouette
+simili. È una scelta esplicita dell'utente, misurabile e reversibile: basta
+ripristinare l'ordine fisso nel manifest.
+
+### La difficoltà si misura, non si decide ora
+
+Caricare tutti i modelli rende `TYPE_COUNT` dinamico e la difficoltà lo segue:
+`types = min(TYPE_COUNT, triples, 3 + ⌊n/1,8⌋)`. Con 14 modelli il livello 25
+passerebbe da 12 a 16 tipi distinti contro 5 soli scomparti.
+
+Decisione presa: **nessun tetto per ora**, ma l'impatto va misurato con
+`verify:play` quando i modelli esisteranno, e i numeri vanno portati all'utente
+prima di lasciare le cose così.
+
 ## 6. Cosa questa spec NON fa
 
 - Non aggiunge modelli: non esistono ancora i file.
