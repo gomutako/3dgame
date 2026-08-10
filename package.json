@@ -13,14 +13,17 @@
     "verify:play": "node scripts/playthrough.mjs",
     "verify:boosters": "node scripts/verify-boosters.mjs",
     "verify:physics": "node scripts/verify-physics.mjs",
-    "check-model": "node scripts/check-model.mjs"
+    "check-model": "node scripts/check-model.mjs",
+    "prepare-model": "node scripts/prepare-model.mjs"
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.20.0",
     "three": "^0.185.1"
   },
   "devDependencies": {
+    "@gltf-transform/cli": "^4.4.2",
     "@gltf-transform/core": "^4.4.2",
+    "obj2gltf": "^3.2.0",
     "vite": "^8.2.1"
   }
 }

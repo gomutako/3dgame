@@ -3,3 +3,6 @@ dist/
 .wrangler/
 .DS_Store
 *.log
+
+# Metadati dei download di Windows (Alternate Data Stream)
+*:Zone.Identifier
