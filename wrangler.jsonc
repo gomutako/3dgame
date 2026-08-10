@@ -1,0 +1,41 @@
+{
+  // =====================================================
+  // Cloudflare — pubblicazione del gioco come Worker con asset statici.
+  //
+  // Non c'è codice Worker: nessun campo "main". Tutta la logica sta nel
+  // browser — un livello è funzione di (seed, numero livello) e non esiste
+  // nessun servizio da interrogare.
+  //
+  // Deploy: lo fa Cloudflare a ogni push su `master`, eseguendo
+  //   build:  npm run build
+  //   deploy: npx wrangler deploy
+  // Da locale si può fare lo stesso con `npx wrangler deploy` dopo `npm run build`.
+  // =====================================================
+  // Deve combaciare col nome del progetto su Cloudflare: `wrangler deploy` usa
+  // questo campo per decidere SU QUALE Worker distribuire, e un nome diverso
+  // finirebbe su un Worker separato da quello collegato al repo.
+  // Determina anche il sottodominio *.workers.dev — non il dominio pubblico,
+  // che è un Custom Domain configurato dal dashboard (vedi DEPLOY.md).
+  "name": "3dgame",
+  "compatibility_date": "2026-08-10",
+
+  "assets": {
+    // Prodotta da `npm run build`.
+    "directory": "./dist",
+
+    // A differenza di ../gym, qui NON va "single-page-application".
+    // gym ha un router Vue: /allenamento non è un file e senza fallback
+    // darebbe 404. Questo gioco non ha rotte — il livello si sceglie con
+    // ?level=N, che non tocca il path. Col fallback attivo, un .glb mancante
+    // riceverebbe index.html al posto di un 404, e l'errore arriverebbe al
+    // giocatore come un parse error incomprensibile invece che come
+    // "file non trovato".
+    "not_found_handling": "none"
+  },
+
+  // Log delle richieste nel dashboard: utile per capire se un 404 arriva
+  // davvero a Cloudflare o si ferma prima (DNS, certificato).
+  "observability": {
+    "enabled": true
+  }
+}
