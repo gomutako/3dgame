@@ -173,13 +173,115 @@ coperti (il puzzle stesso). Sotto il 25% di occlusione la suite fallisce."
 
 ---
 
+### Task 1b: I primi livelli senza occlusione
+
+Emersa misurando il baseline della Task 1, e da fare **prima** della Task 2: cambia l'occlusione, quindi cambia il metro con cui si giudica la fisica nuova.
+
+Livelli 1-2 a **0,0%** di occlusione, 3-4 sotto il 4%. Nei primi quattro livelli la pila è un unico strato piatto: nessun pezzo ne copre un altro, quindi nessun puzzle spaziale. `DESIGN.md` §5 dice che il dimensionamento della scatola serve proprio a evitarlo.
+
+**Causa**, letta in `src/scene/setup.js:35`:
+
+```js
+const side = Math.sqrt((itemCount * ITEM_FOOTPRINT) / layers);
+return Math.min(6, Math.max(3, side + MARGIN));
+```
+
+Per 3 strati i primi livelli vorrebbero un lato fra 2,08 (21 pezzi) e 2,73 (36 pezzi), ma il `Math.max(3, …)` li porta tutti a 3. Una scatola di lato 3 tiene ~14,5 pezzi per strato: il livello 1 ne riempie 1,45.
+
+**Il minimo però non è arbitrario.** In `PileWorld.spawn()` il passo fra le colonne è `usable / cols` con `usable = BOX.size - 2·ITEM_RADIUS`. A lato 3 il passo vale 1,06, appena sopra `CELL` (1,0). A lato 2,6 scende a 0,86: i pezzi nascerebbero **compenetrati**, e `physics.js:110` avverte che le compenetrazioni sparano i pezzi fuori dalla scatola. Abbassare il minimo senza toccare lo spawn romperebbe la generazione.
+
+**Files:**
+- Modify: `src/scene/setup.js:18-37` (`spawnColumns`, `computeBoxSize`)
+- Modify: `src/level/physics.js` (`spawn()`, se il passo va ricavato diversamente)
+
+**Interfaces:**
+- Consumes: `CELL`, `ITEM_FOOTPRINT`, `MARGIN`, `ITEM_RADIUS`.
+- Produces: `computeBoxSize(itemCount, layers)` con minimo più basso; `spawnColumns(size)` che non promette mai più colonne di quante ne entrino a passo `CELL`.
+
+- [ ] **Step 1: Rendere onesto il numero di colonne**
+
+In `src/scene/setup.js` sostituire `spawnColumns`:
+
+```js
+/**
+ * Colonne di spawn che entrano in una scatola di lato `size`.
+ *
+ * Il passo fra le colonne non deve mai scendere sotto CELL: sotto, i pezzi
+ * nascono compenetrati e la prima simulazione li spara fuori dalla scatola
+ * (vedi il commento di resetToSpawn in physics.js). Con scatole molto strette
+ * la risposta giusta è UNA colonna e più strati, non due colonne sovrapposte.
+ */
+export function spawnColumns(size) {
+  const usable = Math.max(CELL, size - ITEM_RADIUS * 2);
+  return Math.max(1, Math.floor(usable / CELL));
+}
+```
+
+- [ ] **Step 2: Abbassare il minimo della scatola**
+
+In `src/scene/setup.js` sostituire il `return` di `computeBoxSize`:
+
+```js
+  // Il minimo è il lato che ospita una sola colonna a passo pieno. Più in
+  // basso non si può: sotto, i pezzi nascerebbero uno dentro l'altro.
+  // Era 3, che sui primi livelli imponeva una pila di un solo strato — cioè
+  // nessuna occlusione, cioè nessun puzzle (misurato: 0,0% ai livelli 1-2).
+  const min = CELL + ITEM_RADIUS * 2;
+  return Math.min(6, Math.max(min, side + MARGIN));
+```
+
+- [ ] **Step 3: Misurare l'effetto sull'occlusione**
+
+Run: `npm run verify:physics 1 12`
+
+Expected: l'occlusione iniziale dei livelli 1-4 **sale sopra lo zero**; la media complessiva sale sopra il baseline di 16,5%.
+
+Se i livelli 1-2 restano a 0,0%, il minimo è ancora troppo alto: stampare `computeBoxSize(21, 3)` e confrontarlo col 2,08 teorico.
+
+- [ ] **Step 4: Verificare che la generazione non si sia rotta**
+
+Run: `npm run verify`
+Expected: quattro suite verdi, exit 0.
+
+⚠️ Il segnale di compenetrazione allo spawn è un livello che fallisce in `verify:levels` o pezzi con `minY` anomalo in `verify:physics`. Se compare, il passo delle colonne è ancora sotto `CELL`: **non** aggirarlo alzando i tentativi del solver.
+
+- [ ] **Step 5: Prova a occhio**
+
+```bash
+npm run dev
+```
+
+Aprire `?level=1` e `?level=2`: la pila deve avere più di uno strato e qualche pezzo coperto. Non deve invece sembrare una torre in colonna al centro — se lo è, `spawnColumns` sta restituendo 1 dove ne entrerebbero 2.
+
+- [ ] **Step 6: Registrare il nuovo baseline**
+
+Rilanciare `npm run verify:physics 1 12` e **annotare** assestamento mediano e occlusione media: sostituiscono i numeri della Task 1 come metro per la Task 2.
+
+Aggiornare di conseguenza il commento di intestazione di `scripts/verify-physics.mjs`, che cita il baseline del 2026-08-10.
+
+- [ ] **Step 7: Commit**
+
+```bash
+git add src/scene/setup.js scripts/verify-physics.mjs
+git commit -m "fix: i primi livelli avevano un solo strato, quindi nessun puzzle
+
+Livelli 1-2 con occlusione 0,0%: la scatola non poteva scendere sotto il
+lato 3, mentre per tenere i ~3 strati promessi da DESIGN.md ne servirebbe
+uno da 2,08 con 21 pezzi. Il minimo era lì per un motivo — sotto, il passo
+fra le colonne di spawn scende sotto CELL e i pezzi nascono compenetrati —
+quindi scende insieme a spawnColumns, che ora non promette mai più colonne
+di quante ne entrino a passo pieno."
+```
+
+---
+
 ### Task 2: Applicare e tarare le costanti
 
 **Files:**
 - Modify: `src/level/physics.js`
 
 **Interfaces:**
-- Consumes: le metriche della Task 1.
+- Consumes: le metriche della Task 1, **aggiornate dalla Task 1b**.
 - Produces: costanti nuove; nessuna firma cambia.
 
 - [ ] **Step 1: Abbassare la gravità e ammorbidire lo smorzamento**
